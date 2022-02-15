@@ -214,6 +214,7 @@ class DataGenerator_extended(keras.utils.Sequence):
         """
         Data generator for WeatherBench data.
         Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+        Adapted by https://github.com/pangeo-data/WeatherBench/blob/master/src/train_nn.py
         Args:
             ds: Dataset containing all variables
             var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
@@ -233,7 +234,6 @@ class DataGenerator_extended(keras.utils.Sequence):
         data = []
         generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
         for var, levels in var_dict.items():
-            #if var=="T2MMEAN":
             if levels is None:
                 data.append(ds[var].expand_dims({'level': generic_level}, 1)) 
             else:
@@ -242,6 +242,7 @@ class DataGenerator_extended(keras.utils.Sequence):
         self.data = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
         self.mean = self.data.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
         self.std = self.data.std('time').mean(('lat', 'lon')).compute() if std is None else std
+        
         # Normalize
         self.data = (self.data - self.mean) / self.std
         self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
