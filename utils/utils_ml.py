@@ -210,7 +210,7 @@ class DataGenerator(keras.utils.Sequence):
 
     
 class DataGenerator_extended(keras.utils.Sequence):
-    def __init__(self, ds, var_dict, lead_time, batch_size=32, shuffle=True, load=True, mean=None, std=None):
+    def __init__(self, ds, var_dict, lead_time=0, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
         Data generator for WeatherBench data.
         Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
@@ -242,7 +242,7 @@ class DataGenerator_extended(keras.utils.Sequence):
         self.data = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
         self.mean = self.data.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
         self.std = self.data.std('time').mean(('lat', 'lon')).compute() if std is None else std
-        
+
         # Normalize
         self.data = (self.data - self.mean) / self.std
         self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
