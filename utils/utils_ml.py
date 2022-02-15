@@ -208,7 +208,7 @@ class DataGenerator(keras.utils.Sequence):
         # For some weird reason calling .load() earlier messes up the mean and std computations
         if load: print('Loading data into RAM'); self.data.load()
 
-    
+
 class DataGenerator_extended(keras.utils.Sequence):
     def __init__(self, ds, var_dict, lead_time=0, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
@@ -270,9 +270,70 @@ class DataGenerator_extended(keras.utils.Sequence):
         self.idxs = np.arange(self.n_samples)
         if self.shuffle == True:
             np.random.shuffle(self.idxs)
-            
-            
-            
+
+
+class DataGeneratorForPrecip(keras.utils.Sequence):
+    def __init__(self, X, y, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
+        """
+        Data generator class.
+        Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+        Adapted by https://github.com/pangeo-data/WeatherBench/blob/master/src/train_nn.py
+        Args:
+            X: Dataset containing all predictor variables
+            y: Dataset containing the variable
+            var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
+            batch_size: Batch size
+            shuffle: bool. If True, data is shuffled.
+            load: bool. If True, datadet is loaded into RAM.
+            mean: If None, compute mean from data.
+            std: If None, compute standard deviation from data.
+        """
+        self.y = y
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+        data = []
+        generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
+        for var, levels in var_dict.items():
+            if levels is None:
+                data.append(X[var].expand_dims({'level': generic_level}, 1)) 
+            else:
+                data.append(X[var])
+
+        self.X = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
+        self.mean = self.X.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
+        self.std = self.X.std('time').mean(('lat', 'lon')).compute() if std is None else std
+
+        # Normalize
+        self.X = (self.X - self.mean) / self.std
+        self.n_samples = self.X.shape[0]
+
+        self.on_epoch_end()
+
+        # For some weird reason calling .load() earlier messes up the mean and std computations
+        if load: 
+            print('Loading data into RAM')
+            self.X.load()
+            self.y.load()
+
+    def __len__(self):
+        'Denotes the number of batches per epoch'
+        return int(np.floor(self.n_samples / self.batch_size))
+
+    def __getitem__(self, i):
+        'Generate one batch of data'
+        idxs = self.idxs[i * self.batch_size:(i + 1) * self.batch_size]
+        X = self.X.isel(time=idxs).values
+        y = self.y.isel(time=idxs).values
+        return X, y
+
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        self.idxs = np.arange(self.n_samples)
+        if self.shuffle == True:
+            np.random.shuffle(self.idxs)
+
+
             
 # From https://github.com/pangeo-data/WeatherBench/blob/master/src/score.py
 def compute_weighted_rmse(da_fc, da_true, mean_dims=xr.ALL_DIMS):
