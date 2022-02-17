@@ -1,8 +1,6 @@
 import numpy as np
 import xarray as xr
 
-G = 9.80665
-
 
 def rename_dimensions_variables(ds):
     """Rename dimensions and attributes of the given dataset to homogenize data."""
@@ -27,52 +25,6 @@ def get_era5_data(files, start, end):
         ds = ds.drop('time_bnds')
 
     return ds
-
-
-def extract_points_around(ds, lat, lon, step_lat, step_lon, nb_lat, nb_lon, levels=0):
-    """Return the time series data for a grid point mesh around the provided coordinates.
-
-    Arguments:
-    ds -- the dataset (xarray Dataset) to extract the data from
-    lat -- the latitude coordinate of the center of the mesh
-    lon -- the longitude coordinate of the center of the mesh
-    step_lat -- the step in latitude of the mesh
-    step_lon -- the step in longitude of the mesh
-    nb_lat -- the total number of grid points to extract for the latitude axis (the mesh will be centered)
-    nb_lon -- the total number of grid points to extract for the longitude axis (the mesh will be centered)
-    levels -- the desired vertical level(s)
-
-    Example:
-    z = xr.open_mfdataset(DATADIR + '/ERA5/geopotential/*.nc', combine='by_coords')
-    a = extract_points_around(z, CH_CENTER[0], CH_CENTER[1], step_lat=1, step_lon=1, nb_lat=3, nb_lon=3)
-    """
-    lats = np.arange(lat - step_lat * (nb_lat - 1) / 2,
-                     lat + step_lat * nb_lat / 2, step_lat)
-    lons = np.arange(lon - step_lon * (nb_lon - 1) / 2,
-                     lon + step_lon * nb_lon / 2, step_lon)
-
-    if 'level' in ds.dims:
-        data = ds.sel({'lat': lats, 'lon': lons,
-                      'level': levels}, method='nearest')
-    else:
-        data = ds.sel({'lat': lats, 'lon': lons}, method='nearest')
-
-    return data
-
-
-def extract_points_around_CH(ds, step_lat, step_lon, nb_lat, nb_lon, levels=0):
-    """Return the time series data for a grid point mesh around Switzerland.
-
-    Arguments:
-    ds -- the dataset (xarray Dataset) to extract the data from
-    step_lat -- the step in latitude of the mesh
-    step_lon -- the step in longitude of the mesh
-    nb_lat -- the total number of grid points to extract for the latitude axis (the mesh will be centered)
-    nb_lon -- the total number of grid points to extract for the longitude axis (the mesh will be centered)
-    levels -- the desired vertical level(s)
-    """
-    return extract_points_around(ds, CH_CENTER[0], CH_CENTER[1], step_lat=step_lat, step_lon=step_lon,
-                                 nb_lat=nb_lat, nb_lon=nb_lon, levels=levels)
 
 
 def precip_exceedance(precip, qt=0.95):
