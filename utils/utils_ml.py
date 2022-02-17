@@ -272,7 +272,7 @@ class DataGenerator_extended(keras.utils.Sequence):
             np.random.shuffle(self.idxs)
 
 
-class DataGeneratorForPrecip(keras.utils.Sequence):
+class WeatherDataGenerator(keras.utils.Sequence):
     def __init__(self, X, y, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
         Data generator class.
@@ -288,7 +288,7 @@ class DataGeneratorForPrecip(keras.utils.Sequence):
             mean: If None, compute mean from data.
             std: If None, compute standard deviation from data.
         """
-        self.y = y
+        self.y = y.tp
         self.batch_size = batch_size
         self.shuffle = shuffle
 
