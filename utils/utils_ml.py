@@ -13,6 +13,9 @@ import tensorflow as tf
 from tensorflow import keras
 import tensorflow.keras.backend as tfb
 from collections import OrderedDict
+import tensorflow.keras.backend as K
+from sklearn.utils import class_weight
+from sklearn.utils import shuffle
 
 
 
@@ -72,6 +75,44 @@ def weighted_binary_crossentropy(target, output):
 
     return tf.reduce_mean(loss, axis=-1)
     
+    
+def weighted_binary_cross_entropy(weights: dict, from_logits: bool = False):
+    """
+    credits: https://stackoverflow.com/questions/46009619/keras-weighted-binary-crossentropy
+    Return a function for calculating weighted binary cross entropy
+    It should be used for multi-hot encoded labels
+    @param weights A dict setting weights for 0 and 1 label. e.g.
+        {
+            0: 1.
+            1: 8.
+        }
+        For this case, we want to emphasise those true (1) label, 
+        because we have many false (0) label. e.g. 
+            [
+                [0 1 0 0 0 0 0 0 0 1]
+                [0 0 0 0 1 0 0 0 0 0]
+                [0 0 0 0 1 0 0 0 0 0]
+            ]
+
+
+
+    @param from_logits If False, we apply sigmoid to each logit
+    @return A function to calcualte (weighted) binary cross entropy
+    '''
+    """
+    assert 0 in weights
+    assert 1 in weights
+
+    def weighted_cross_entropy_fn(y_true, y_pred):
+        tf_y_true = tf.cast(y_true, dtype=y_pred.dtype)
+        tf_y_pred = tf.cast(y_pred, dtype=y_pred.dtype)
+
+        weights_v = tf.where(tf.equal(tf_y_true, 1), weights[1], weights[0])
+        ce = K.binary_crossentropy(tf_y_true, tf_y_pred, from_logits=from_logits)
+        loss = K.mean(tf.multiply(ce, weights_v))
+        return loss
+
+    return weighted_cross_entropy_fn
 
 def split_data(df, yy_train, yy_test, attributes, ylabel):
     """"Split the data into train and test
@@ -163,6 +204,7 @@ def evaluate_model(test_labels, train_labels, predictions, probs, train_predicti
 
 
 class DataGenerator(keras.utils.Sequence):
+    # credits: https://github.com/pangeo-data/WeatherBench/blob/master/notebooks/3-cnn-example.ipynb
     def __init__(self, ds, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
     #def __init__(self, ds, var_dict, lead_time, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
@@ -208,17 +250,19 @@ class DataGenerator(keras.utils.Sequence):
         # For some weird reason calling .load() earlier messes up the mean and std computations
         if load: print('Loading data into RAM'); self.data.load()
 
-
-class DataGenerator_extended(keras.utils.Sequence):
-    def __init__(self, ds, var_dict, lead_time=0, batch_size=32, shuffle=True, load=True, mean=None, std=None):
+    
+class MyDataGenerator(keras.utils.Sequence):
+    # adapted from: https://github.com/pangeo-data/WeatherBench/blob/master/notebooks/3-cnn-example.ipynb
+    def __init__(self, ds, labels, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
         Data generator for WeatherBench data.
         Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
         Adapted by https://github.com/pangeo-data/WeatherBench/blob/master/src/train_nn.py
         Args:
             ds: Dataset containing all variables
+            # change
+            labels: predictand i.e. Target variable. It must be np.array
             var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
-            lead_time: Lead time in hours
             batch_size: Batch size
             shuffle: bool. If True, data is shuffled.
             load: bool. If True, datadet is loaded into RAM.
@@ -229,7 +273,8 @@ class DataGenerator_extended(keras.utils.Sequence):
         self.var_dict = var_dict
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.lead_time = lead_time
+        self.labels = labels
+
 
         data = []
         generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
@@ -245,14 +290,18 @@ class DataGenerator_extended(keras.utils.Sequence):
 
         # Normalize
         self.data = (self.data - self.mean) / self.std
-        self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
-        self.init_time = self.data.isel(time=slice(None, -lead_time)).time
-        self.valid_time = self.data.isel(time=slice(lead_time, None)).time
+        self.n_samples = self.data.shape[0]
+        #self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
+        #self.init_time = self.data.isel(time=slice(None, -lead_time)).time
+        #self.valid_time = self.data.isel(time=slice(lead_time, None)).time
 
         self.on_epoch_end()
 
         # For some weird reason calling .load() earlier messes up the mean and std computations
-        if load: print('Loading data into RAM'); self.data.load()
+        if load: 
+            print('Loading data into RAM') 
+            self.data.load()
+            self.labels.load()
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -262,9 +311,11 @@ class DataGenerator_extended(keras.utils.Sequence):
         'Generate one batch of data'
         idxs = self.idxs[i * self.batch_size:(i + 1) * self.batch_size]
         X = self.data.isel(time=idxs).values
-        y = self.data.isel(time=idxs + self.lead_time).values
+        y = self.labels.isel(time=idxs).values
+        #y = self.labels[idxs,:,:]
+        #y = self.data.isel(time=idxs + self.lead_time).values
         return X, y
-
+    
     def on_epoch_end(self):
         'Updates indexes after each epoch'
         self.idxs = np.arange(self.n_samples)
@@ -336,7 +387,54 @@ class WeatherDataGenerator(keras.utils.Sequence):
 
             
 # From https://github.com/pangeo-data/WeatherBench/blob/master/src/score.py
+            
+            
+def datanormalise(ds, yy, var_dict, mean=None, std=None, shuf=False, extend_dim = False):
+    """Function to normalise the inputs
+       Args:
+       ds is the list with the predictors
+       yy is the labels
+       var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
+       mean: If None, compute mean from data.
+       std: If None, compute standard deviation from data.
+       shuffle: if True, data is shuffled
+       extend_dim: if one more dimension is wanted
+        """
+    data = []
+    generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
+    for var, levels in var_dict.items():
+        #if var=="T2MMEAN":
+        if levels is None:
+            data.append(ds[var].expand_dims({'level': generic_level}, 1)) 
+        else:
+            data.append(ds[var])
+    
+    data = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
+    mean = data.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
+    std = data.std('time').mean(('lat', 'lon')).compute() if std is None else std
+    # Normalize
+    data = (data - mean) / std
+    y = np.array(yy)
+    np_data = np.array(data)
+
+    
+    if shuf == True:
+        np_data = shuffle(np_data)
+        y = shuffle(y)
+        
+    if extend_dim ==True:
+        # This is for the CONVLSTM
+        # Expand the dimensions for convLSTM as it expects a 5D tensor
+        np_data = tf.expand_dims(np_data, -1)
+        y = tf.expand_dims(y, -1)    
+    
+    return np_data, y, mean, std
+    
+    
+            
 def compute_weighted_rmse(da_fc, da_true, mean_dims=xr.ALL_DIMS):
+    
+# From https://github.com/pangeo-data/WeatherBench/blob/master/src/score.py
     """
     Compute the RMSE with latitude weighting from two xr.DataArrays.
     Args:
@@ -354,12 +452,18 @@ def compute_weighted_rmse(da_fc, da_true, mean_dims=xr.ALL_DIMS):
 
 
 def get_rmse(truth, pred):
+    """Function to calculate the RMSE
+       It is similar to compute_weighted_rmse"""
     weights = np.cos(np.deg2rad(truth.lat))
     rmse = np.sqrt(((truth - pred)**2).weighted(weights).mean(['lat', 'lon']))
     return rmse
 
 
 def compute_weighted_acc(da_fc, da_true, mean_dims=xr.ALL_DIMS):
+    
+    
+   # From https://github.com/pangeo-data/WeatherBench/blob/master/src/score.py
+
     """
     Compute the ACC with latitude weighting from two xr.DataArrays.
     WARNING: Does not work if datasets contain NaNs

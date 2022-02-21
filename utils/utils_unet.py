@@ -26,6 +26,7 @@ def Unet1(input_s, num_filters, ks, activation):
     it consits on 2 main parts: enconder-decoder
     In this model UpSampling is used to upscale
     no dropout or bachtnormalization"""
+    # Adapted from: https://github.com/work-mohit/U-Net_From-Scratch/blob/master/UNet.ipynb
     
     img = Input(shape=input_s)
     x = img
@@ -166,6 +167,7 @@ def build_bottleneck(previous_layer, filters, activation, use_batchnorm, dropout
 class Unet2():
     """Similar to Unet1 but using batchnorm- dropout
        the decoder part uses Conv2DTranspose"""
+    # Adapted from https://github.com/nikhilroxtomar/Unet-for-Person-Segmentation/blob/main/model.py
     def __init__(self, input_s, output_channels ):
         self.input_s = input_s
         self.output_channels = output_channels
