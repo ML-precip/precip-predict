@@ -36,8 +36,8 @@ def spatial_slice(ds, lon_bnds, lat_bnds):
     return ds
 
 
-def get_era5_data(files, start, end, lon_bnds=None, lat_bnds=None):
-    """Extract ERA5 data for the given file(s) pattern/path."""
+def get_nc_data(files, start, end, lon_bnds=None, lat_bnds=None):
+    """Extract netCDF data for the given file(s) pattern/path."""
     print('Extracting data for the period {} - {}'.format(start, end))
     ds = xr.open_mfdataset(files, combine='by_coords')
     ds = rename_dimensions_variables(ds)
@@ -45,6 +45,12 @@ def get_era5_data(files, start, end, lon_bnds=None, lat_bnds=None):
     ds = spatial_slice(ds, lon_bnds, lat_bnds)
 
     return ds
+
+
+def get_era5_data(files, start, end, lon_bnds=None, lat_bnds=None):
+    """Extract ERA5 data for the given file(s) pattern/path."""
+    
+    return get_nc_data(files, start, end, lon_bnds, lat_bnds)
 
 
 def precip_exceedance(precip, qt=0.95):

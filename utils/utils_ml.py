@@ -339,7 +339,7 @@ class WeatherDataGenerator(keras.utils.Sequence):
             mean: If None, compute mean from data.
             std: If None, compute standard deviation from data.
         """
-        self.y = y.tp
+        self.y = y
         self.batch_size = batch_size
         self.shuffle = shuffle
 
