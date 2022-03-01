@@ -60,9 +60,10 @@ def Unet1(input_s, num_filters, ks, activation):
     
     
     # deconding part
-    # Upsampling 
+    # Upsampling-> change to Conv2D 
     # upconv1 
-    up_conv1 = UpSampling2D((2,2))(conv5)
+    #up_conv1 = UpSampling2D((2,2))(conv5)
+    up_conv1 = Conv2DTranspose(num_filters*8, (2, 2), strides=(2, 2), padding='same')(conv5)
     print(up_conv1.shape) 
     crop= crop_output(up_conv1, conv4)
     merged = Concatenate()([crop, up_conv1])
@@ -71,7 +72,8 @@ def Unet1(input_s, num_filters, ks, activation):
     print('Up-conv 1:',up_conv_conv1.shape)
     
     # upconv2 
-    up_conv2 = UpSampling2D((2,2))(up_conv_conv1)
+    #up_conv2 = UpSampling2D((2,2))(up_conv_conv1)
+    up_conv2 = Conv2DTranspose(num_filters*4, (2, 2), strides=(2, 2), padding='same')(up_conv_conv1)
     print(up_conv2)
     crop2 = crop_output(up_conv2, conv3)
     print(crop2.shape)
@@ -82,7 +84,8 @@ def Unet1(input_s, num_filters, ks, activation):
     print('Up_conv 2:',up_conv_conv2.shape)
     
      # upconv3
-    up_conv3 = UpSampling2D((2,2))(up_conv_conv2)
+    #up_conv3 = UpSampling2D((2,2))(up_conv_conv2)
+    up_conv3 = Conv2DTranspose(num_filters*2, (2, 2), strides=(2, 2), padding='same')(up_conv2)
     crop3 = crop_output(up_conv3, conv2)      
     merged = Concatenate()([up_conv3, crop3])
     print('Conv 3 merger',merged.shape)
@@ -91,7 +94,11 @@ def Unet1(input_s, num_filters, ks, activation):
     print('Up-conv 3:',up_conv_conv3.shape)
     
     # upconv4
-    up_conv4 = UpSampling2D((2,2))(up_conv_conv3)
+    
+    #up_conv4 = UpSampling2D((2,2))(up_conv_conv3)
+    # I need to increase the strides to match the size!
+    up_conv4 = Conv2DTranspose(num_filters*1, (2, 2), strides=(2, 2), padding='same')(up_conv3)
+    # and crop accordingly
     crop4 = crop_output(up_conv4, conv1)      
     merged = Concatenate()([up_conv4, crop4])
     up_conv_conv4 = Conv2D(num_filters*1,kernel_size=ks,padding=pad,activation=activation)(merged)
@@ -125,13 +132,13 @@ def build_encoder_block(previous_layer, filters, activation, use_batchnorm, drop
     return c, p
 
 
-
-
 # decoder part
 def build_decoder_block(previous_layer, skip_layer, is_last, filters, activation, use_batchnorm, dropout):
     """Decoder part for the class Unet2"""
     u = Conv2DTranspose(filters, (2, 2), strides=(2, 2), 
                         padding='same')(previous_layer)
+   
+    skip_layer= crop_output(u, skip_layer)    
     u = Concatenate()([u, skip_layer])
     c = Conv2D(filters, (3, 3), activation=activation, 
                kernel_initializer='he_normal', padding='same')(u)
@@ -168,25 +175,28 @@ class Unet2():
     """Similar to Unet1 but using batchnorm- dropout
        the decoder part uses Conv2DTranspose"""
     # Adapted from https://github.com/nikhilroxtomar/Unet-for-Person-Segmentation/blob/main/model.py
-    def __init__(self, input_s, output_channels ):
+    def __init__(self, input_s, output_channels, num_filters, use_batchnorm, dropout):
         self.input_s = input_s
         self.output_channels = output_channels
+        self.num_filters = num_filters
+        self.use_batchnorm = use_batchnorm
+        self.droput = dropout
         
     def build_model(self):
     
         inputs = Input(self.input_s)
             #inputs = Input(shape=self.input_s)
-        x1, pp1 = build_encoder_block(inputs, 64,  "relu", True, True)
-        x2, pp2 = build_encoder_block(pp1, 128,  "relu", True, True)
-        x3, pp3 = build_encoder_block(pp2, 256,  "relu", True, True)
-        x4, pp4 = build_encoder_block(pp3, 512,  "relu", True, True)
+        x1, pp1 = build_encoder_block(inputs, self.num_filters*2,  "relu", self.use_batchnorm, self.droput)
+        x2, pp2 = build_encoder_block(pp1, self.num_filters*4,  "relu", self.use_batchnorm, self.droput)
+        x3, pp3 = build_encoder_block(pp2, self.num_filters*8,  "relu", self.use_batchnorm, self.droput)
+        x4, pp4 = build_encoder_block(pp3, self.num_filters*16,  "relu", self.use_batchnorm, self.droput)
 
-        tb = build_bottleneck(pp4, 1024, "relu", True, True)
+        tb = build_bottleneck(pp4, self.num_filters*32, "relu", True, True)
 
-        dd1 = build_decoder_block(tb, x4, False, 512, "relu", True, True)
-        dd2 = build_decoder_block(dd1, x3,False, 256, "relu", True, True)
-        dd3 = build_decoder_block(dd2, x2,False, 128, "relu", True, True)
-        dd4 = build_decoder_block(dd3, x1, True, 64,"relu", True, True)
+        dd1 = build_decoder_block(tb, x4, False, self.num_filters*16, "relu", self.use_batchnorm, self.droput)
+        dd2 = build_decoder_block(dd1, x3,False, self.num_filters*8, "relu", self.use_batchnorm, self.droput)
+        dd3 = build_decoder_block(dd2, x2,False, self.num_filters*4, "relu", self.use_batchnorm, self.droput)
+        dd4 = build_decoder_block(dd3, x1, True, self.num_filters*2,"relu", self.use_batchnorm, self.droput)
 
         output_function = 'softmax' if self.output_channels > 1 else 'sigmoid'
         ouput_layer     = Conv2D(self.output_channels, (1, 1),

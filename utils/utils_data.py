@@ -1,6 +1,10 @@
 import numpy as np
 import xarray as xr
-
+import pandas as pd
+import geopandas as gpd
+import dask
+import datetime
+from dotenv import dotenv_values
 
 def rename_dimensions_variables(ds):
     """Rename dimensions and attributes of the given dataset to homogenize data."""
@@ -99,3 +103,39 @@ def get_Y_sets(dat, YY_TRAIN, YY_VAL, YY_TEST):
     Y_test_input = np.array(Y_test)
 
     return Y_train_input, Y_val_input, Y_test_input
+
+
+
+
+def load_data(i_vars, i_paths, G, PATH_ERA5, DATE_START, DATE_END, LONS, LATS, LEVELS):
+    """Load the data
+       Args: 
+       Var: variables
+       PATH_ERA5: path to the era5 datasets
+       DATE_START: starting date
+       DATE_END: end date
+       LONS: longitudes
+       LATS: latitudes"""
+
+    
+    l_vars = []
+    for iv in range(0,len(i_vars)):
+        
+        if i_vars[iv] == 't2m':
+            vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'Grid1_Daymean_era5_T2M_EU_19790101-20211231.nc', DATE_START, DATE_END, LONS, LATS)
+        else:
+            vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'*nc', DATE_START, DATE_END, LONS, LATS)
+         
+        if i_vars[iv] == 'z':
+            vv = vv.sel(level=LEVELS)
+            vv.z.values = vv.z.values/G
+        elif i_vars[iv] == 'rh':
+            vv = vv.sel(level=LEVELS)
+            
+        vv['time'] = pd.DatetimeIndex(vv.time.dt.date)
+    
+        l_vars.append(vv)
+
+    
+    
+    return l_vars
