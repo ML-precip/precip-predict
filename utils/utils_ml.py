@@ -324,8 +324,8 @@ class MyDataGenerator(keras.utils.Sequence):
             np.random.shuffle(self.idxs)
 
 
-class WeatherDataGenerator(keras.utils.Sequence):
-    def __init__(self, X, y, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
+class DataGeneratorWithExtremes(keras.utils.Sequence):
+    def __init__(self, X, y, y_xtrm, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
         """
         Data generator class.
         Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
@@ -341,8 +341,10 @@ class WeatherDataGenerator(keras.utils.Sequence):
             std: If None, compute standard deviation from data.
         """
         self.y = y
+        self.y_xtrm = y_xtrm
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.for_xtrm = False
 
         data = []
         generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
@@ -367,6 +369,7 @@ class WeatherDataGenerator(keras.utils.Sequence):
             print('Loading data into RAM')
             self.X.load()
             self.y.load()
+            self.y_xtrm.load()
 
     def __len__(self):
         'Denotes the number of batches per epoch'
@@ -376,8 +379,14 @@ class WeatherDataGenerator(keras.utils.Sequence):
         'Generate one batch of data'
         idxs = self.idxs[i * self.batch_size:(i + 1) * self.batch_size]
         X = self.X.isel(time=idxs).values
-        y = self.y.isel(time=idxs).values
+        if self.for_xtrm:
+            y = self.y_xtrm.isel(time=idxs).values
+        else:
+            y = self.y.isel(time=idxs).values
         return X, y
+
+    def for_extremes(self, val=True):
+        self.for_xtrm = val
 
     def on_epoch_end(self):
         'Updates indexes after each epoch'
