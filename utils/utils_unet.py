@@ -3,19 +3,25 @@ from keras.layers.wrappers import TimeDistributed
 from keras.models import Sequential
 from keras.layers import Dense,LSTM,Conv2D, BatchNormalization,Flatten, MaxPooling2D
 from keras.layers import Conv2DTranspose,Concatenate,UpSampling2D,Cropping2D
-from keras.layers import Input, Lambda, Reshape, Dropout, Activation
+from keras.layers import Input, Lambda, Reshape, Dropout, Activation, ZeroPadding2D
 
 from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, MaxPool2D, Conv2DTranspose, Concatenate, Input
 from tensorflow.keras.models import Model
 
 
 def crop_output(u1,c1):
-        h, w = c1.shape[1:3]  # reconstructed width and hight
-        h_tgt, w_tgt = u1.shape[1:3]
-        dh = h - h_tgt  # deltas to be cropped away
-        dw = w - w_tgt
-        crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
-        return(crop)
+    # u1: layer with the wanted shapes
+    # c1: layer to crop out
+    h, w = c1.shape[1:3]  # reconstructed width and hight
+    h_tgt, w_tgt = u1.shape[1:3]
+    dh = h - h_tgt  # deltas to be cropped away
+    dw = w - w_tgt
+        
+    if dh < 0 or dw < 0:
+        raise('Negative values in output cropping')
+            
+    crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
+    return(crop)
     
     
     
@@ -169,15 +175,62 @@ def build_bottleneck(previous_layer, filters, activation, use_batchnorm, dropout
 
     return c
 
+# Adding padding and cropping parts -- 
+            
+        
+def padding_block(x, factor):
+    
+    h, w = x.get_shape().as_list()[1:3]
+    dh = 0
+    dw = 0
+    if h % factor > 0:
+        dh = factor - h % factor
+    if w % factor > 0:
+        dw = factor - w % factor
+    if dh > 0 or dw > 0:
+        top_pad = dh//2
+        bottom_pad = dh//2 + dh%2
+        left_pad = dw//2
+        right_pad = dw//2 + dw%2
+        x = ZeroPadding2D(padding=((top_pad, bottom_pad), (left_pad, right_pad)))(x)
+        
+    return x
+        
+        
+def final_cropping_block(x):
+    # Compute difference between reconstructed width and hight and the desired output size.
+    h, w = x.get_shape().as_list()[1:3]
+    h_tgt, w_tgt = self.output_size[:2]
+    dh = h - h_tgt
+    dw = w - w_tgt
+
+    if dh < 0 or dw < 0:
+        raise('Negative values in output cropping')
+
+    # Add to decoder cropping layer and final reshaping
+    x = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(x)
+    x = Reshape(target_shape=self.output_size,)(x)
+        
+    return x
+        
+
+def get_size_for(stride_factor):
+    next_shape = output_size.copy()
+    next_shape[0] = int(np.ceil(next_shape[0]/stride_factor))
+    next_shape[1] = int(np.ceil(next_shape[1]/stride_factor))
+
+    return next_shape
+
 
 
 class Unet2():
     """Similar to Unet1 but using batchnorm- dropout
        the decoder part uses Conv2DTranspose"""
     # Adapted from https://github.com/nikhilroxtomar/Unet-for-Person-Segmentation/blob/main/model.py
-    def __init__(self, input_s, output_channels, num_filters, use_batchnorm, dropout):
+    def __init__(self, input_s, output_size, output_channels, num_filters, use_batchnorm, dropout):
         self.input_s = input_s
         self.output_channels = output_channels
+        self.output_size = output_size
         self.num_filters = num_filters
         self.use_batchnorm = use_batchnorm
         self.droput = dropout
@@ -185,8 +238,10 @@ class Unet2():
     def build_model(self):
     
         inputs = Input(self.input_s)
-            #inputs = Input(shape=self.input_s)
-        x1, pp1 = build_encoder_block(inputs, self.num_filters*2,  "relu", self.use_batchnorm, self.droput)
+        # Additional padding if needed 
+        x = padding_block(inputs, factor=16)
+            
+        x1, pp1 = build_encoder_block(x, self.num_filters*2,  "relu", self.use_batchnorm, self.droput)
         x2, pp2 = build_encoder_block(pp1, self.num_filters*4,  "relu", self.use_batchnorm, self.droput)
         x3, pp3 = build_encoder_block(pp2, self.num_filters*8,  "relu", self.use_batchnorm, self.droput)
         x4, pp4 = build_encoder_block(pp3, self.num_filters*16,  "relu", self.use_batchnorm, self.droput)
@@ -199,8 +254,11 @@ class Unet2():
         dd4 = build_decoder_block(dd3, x1, True, self.num_filters*2,"relu", self.use_batchnorm, self.droput)
 
         output_function = 'softmax' if self.output_channels > 1 else 'sigmoid'
-        ouput_layer     = Conv2D(self.output_channels, (1, 1),
+        output_layer     = Conv2D(self.output_channels, (1, 1),
                                          activation=output_function)(dd4)
-        u_model = Model(inputs=inputs,outputs=ouput_layer)
+        # Additional cropping
+        
+        output_layer = crop_output(inputs,output_layer)
+        u_model = Model(inputs=inputs,outputs=output_layer)
 
         return(u_model)

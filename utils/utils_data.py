@@ -81,8 +81,8 @@ def precip_exceedance_xarray(precip, qt=0.95):
     precip -- xarray with precipitation 
     qt -- the desired quantile
     """
-    qq = xr.DataArray(precip.tp).quantile(qt, dim='time') 
-    out = xr.DataArray(precip.tp > qq)
+    qq = xr.DataArray(precip).quantile(qt, dim='time') 
+    out = xr.DataArray(precip > qq)
     out = out*1
 
     return out
