@@ -3,7 +3,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.metrics import precision_score, recall_score, roc_auc_score, roc_curve
+from sklearn.metrics import precision_score, recall_score, roc_auc_score, roc_curve, confusion_matrix
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt

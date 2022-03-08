@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import pandas as pd
+import geopandas as gpd
 
 
 def plot_prediction_scatter(y_test, y_pred):
@@ -71,10 +72,14 @@ def plot_hist(history):
     
 def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None):
     """ Plotting a map with the provided values and the country boundaries."""
+    
+    # Load country outlines
+    world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
+
     im = ax.pcolormesh(lons, lats, vals, shading='auto', vmin=vmin, vmax=vmax, cmap=cmap)
     world.boundary.plot(ax=ax, lw=1, color='k')
     ax.set_xlim(min(lons), max(lons))
     ax.set_ylim(min(lats), max(lats))
     if title:
         ax.set_title(title)
-    fig.colorbar(im, ax=ax)
+    plt.colorbar(im, ax=ax)
