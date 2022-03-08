@@ -526,6 +526,19 @@ def compute_weighted_mae(da_fc, da_true, mean_dims=xr.ALL_DIMS):
     return mae
 
 
+def eval_confusion_matrix_on_map(y_true, y_pred):
+    """Compute the confusion matrix values for each point of the map"""
+    tn = np.zeros(y_pred.shape[1:3])
+    fp = np.zeros(y_pred.shape[1:3])
+    fn = np.zeros(y_pred.shape[1:3])
+    tp = np.zeros(y_pred.shape[1:3])
+    for i_lat in range(y_pred.shape[1]):
+        for i_lon in range(y_pred.shape[2]):
+            tn[i_lat, i_lon], fp[i_lat, i_lon], fn[i_lat, i_lon], tp[i_lat, i_lon] = confusion_matrix(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon]).ravel()
+
+    return tn, fp, fn, tp
+
+
 def eval_confusion_matrix_scores_on_map(y_true, y_pred, manual=False):
     """Compute the precision and recall values for each point of the map"""
     precision_matrix = np.zeros(y_pred.shape[1:3])
@@ -541,3 +554,14 @@ def eval_confusion_matrix_scores_on_map(y_true, y_pred, manual=False):
                 recall_matrix[i_lat, i_lon] = recall_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon])
     
     return precision_matrix, recall_matrix
+
+
+def eval_roc_auc_score_on_map(y_true, y_probs, manual=False):
+    """Compute the ROC AUC values for each point of the map"""
+    roc_auc_matrix = np.zeros(y_probs.shape[1:3])
+    for i_lat in range(y_probs.shape[1]):
+        for i_lon in range(y_probs.shape[2]):
+            roc_auc_matrix[i_lat, i_lon] = roc_auc_score(y_true[:, i_lat, i_lon], y_probs[:, i_lat, i_lon])
+    
+    return roc_auc_matrix
+

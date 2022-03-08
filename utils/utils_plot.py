@@ -67,3 +67,14 @@ def plot_hist(history):
     plt.legend(loc='upper right')
     
     plt.show()
+
+    
+def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None):
+    """ Plotting a map with the provided values and the country boundaries."""
+    im = ax.pcolormesh(lons, lats, vals, shading='auto', vmin=vmin, vmax=vmax, cmap=cmap)
+    world.boundary.plot(ax=ax, lw=1, color='k')
+    ax.set_xlim(min(lons), max(lons))
+    ax.set_ylim(min(lats), max(lats))
+    if title:
+        ax.set_title(title)
+    fig.colorbar(im, ax=ax)
