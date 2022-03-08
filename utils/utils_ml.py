@@ -524,3 +524,20 @@ def compute_weighted_mae(da_fc, da_true, mean_dims=xr.ALL_DIMS):
     weights_lat /= weights_lat.mean()
     mae = (np.abs(error) * weights_lat).mean(mean_dims)
     return mae
+
+
+def eval_confusion_matrix_scores_on_map(y_true, y_pred, manual=False):
+    """Compute the precision and recall values for each point of the map"""
+    precision_matrix = np.zeros(y_pred.shape[1:3])
+    recall_matrix = np.zeros(y_pred.shape[1:3])
+    for i_lat in range(y_pred.shape[1]):
+        for i_lon in range(y_pred.shape[2]):
+            if manual:
+                tn, fp, fn, tp = confusion_matrix(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon]).ravel()
+                precision_matrix[i_lat, i_lon] = tp / (tp + fp)
+                recall_matrix[i_lat, i_lon] = tp / (tp + fn)
+            else:
+                precision_matrix[i_lat, i_lon] = precision_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon], zero_division=0)
+                recall_matrix[i_lat, i_lon] = recall_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon])
+    
+    return precision_matrix, recall_matrix
