@@ -1,0 +1,3 @@
+[submodule "external/trunet"]
+	path = external/trunet
+	url = https://github.com/Rilwan-A/TRUNET.git
