@@ -203,54 +203,6 @@ def evaluate_model(test_labels, train_labels, predictions, probs, train_predicti
     plt.ylabel('True Positive Rate')
     plt.title('ROC Curves')
 
-
-class DataGenerator(keras.utils.Sequence):
-    # credits: https://github.com/pangeo-data/WeatherBench/blob/master/notebooks/3-cnn-example.ipynb
-    def __init__(self, ds, var_dict, batch_size=32, shuffle=True, load=True, mean=None, std=None):
-    #def __init__(self, ds, var_dict, lead_time, batch_size=32, shuffle=True, load=True, mean=None, std=None):
-        """
-        Data generator for WeatherBench data.
-        Template from https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
-        Args:
-            ds: Dataset containing all variables
-            var_dict: Dictionary of the form {'var': level}. Use None for level if data is of single level
-            lead_time: Lead time in hours # I am skipping it for now
-            batch_size: Batch size
-            shuffle: bool. If True, data is shuffled.
-            load: bool. If True, datadet is loaded into RAM.
-            mean: If None, compute mean from data.
-            std: If None, compute standard deviation from data.
-        """
-        self.ds = ds
-        self.var_dict = var_dict
-        self.batch_size = batch_size
-        self.shuffle = shuffle
-        #self.lead_time = lead_time
-
-        data = []
-        generic_level = xr.DataArray([1], coords={'level': [1]}, dims=['level'])
-        for var, levels in var_dict.items():
-            #if var=="T2MMEAN":
-            if levels is None:
-                data.append(ds[var].expand_dims({'level': generic_level}, 1)) 
-            else:
-                data.append(ds[var])
-    
-   
-        self.data = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
-        self.mean = self.data.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
-        self.std = self.data.std('time').mean(('lat', 'lon')).compute() if std is None else std
-     
-        # Normalize
-        self.data = (self.data - self.mean) / self.std
-        #self.n_samples = self.data.isel(time=slice(0, -lead_time)).shape[0]
-        #self.init_time = self.data.isel(time=slice(None, -lead_time)).time
-        #self.valid_time = self.data.isel(time=slice(lead_time, None)).time
-
-        #self.on_epoch_end()
-        # For some weird reason calling .load() earlier messes up the mean and std computations
-        if load: print('Loading data into RAM'); self.data.load()
-
     
 class MyDataGenerator(keras.utils.Sequence):
     # adapted from: https://github.com/pangeo-data/WeatherBench/blob/master/notebooks/3-cnn-example.ipynb
@@ -565,3 +517,138 @@ def eval_roc_auc_score_on_map(y_true, y_probs, manual=False):
     
     return roc_auc_matrix
 
+
+
+
+
+def get_scores(true, pred, scores):
+
+        """function to get different socres
+         Args: true , observations
+               pred, predictions
+        It is adapted from pySTEPS/pysteps/blob/ba2c81195dd36d1bede5370e0c5c1f4420657d6e/pysteps/verification/detcatscores.py
+               
+        +------------+--------------------------------------------------------+
+        | Name       | Description                                            |
+        +============+========================================================+
+        |  ACC       | accuracy (proportion correct)                          |
+        +------------+--------------------------------------------------------+
+        |  BIAS      | frequency bias                                         |
+        +------------+--------------------------------------------------------+
+        |  CSI       | critical success index (threat score)                  |
+        +------------+--------------------------------------------------------+
+        |  ETS       | equitable threat score                                 |
+        +------------+--------------------------------------------------------+
+        |  F1        | the harmonic mean of precision and sensitivity         |
+        +------------+--------------------------------------------------------+
+        |  FA        | false alarm rate (prob. of false detection, fall-out,  |
+        |            | false positive rate)                                   |
+        +------------+--------------------------------------------------------+
+        |  FAR       | false alarm ratio (false discovery rate)               |
+        +------------+--------------------------------------------------------+
+        |  GSS       | Gilbert skill score (equitable threat score)           |
+        +------------+--------------------------------------------------------+
+        |  HK        | Hanssen-Kuipers discriminant (Pierce skill score)      |
+        +------------+--------------------------------------------------------+
+        |  HSS       | Heidke skill score                                     |
+        +------------+--------------------------------------------------------+
+        |  MCC       | Matthews correlation coefficient                       |
+        +------------+--------------------------------------------------------+
+        |  POD       | probability of detection (hit rate, sensitivity,       |
+        |            | recall, true positive rate)                            |
+        +------------+--------------------------------------------------------+
+        |  SEDI      | symmetric extremal dependency index                    |
+        +------------+--------------------------------------------------------+
+        """
+
+
+        tn, fp, fn, tp = confusion_matrix(true, pred).ravel()
+
+        H = tp  # true positives
+        M = fn # false negatives
+        F = fp  # false positives
+        R = tn # true negatives
+
+        result = {}
+        for score in scores:
+            # catch None passed as score
+            if score is None:
+                continue
+            score_ = score.lower()
+
+            # simple scores
+            POD = H / (H + M)
+            FAR = F / (H + F)
+            FA = F / (F + R)
+            s = (H + M) / (H + M + F + R)
+
+            if score_ in ["pod", ""]:
+                # probability of detection
+                result["POD"] = POD
+            if score_ in ["far", ""]:
+                # false alarm ratio
+                result["FAR"] = FAR
+            if score_ in ["fa", ""]:
+                # false alarm rate (prob of false detection)
+                result["FA"] = FA
+            if score_ in ["acc", ""]:
+                # accuracy (fraction correct)
+                ACC = (H + R) / (H + M + F + R)
+                result["ACC"] = ACC
+            if score_ in ["csi", ""]:
+                # critical success index
+                CSI = H / (H + M + F)
+                result["CSI"] = CSI
+            if score_ in ["bias", ""]:
+                # frequency bias
+                B = (H + F) / (H + M)
+                result["BIAS"] = B
+
+            # skill scores
+            if score_ in ["hss", ""]:
+                # Heidke Skill Score (-1 < HSS < 1) < 0 implies no skill
+                HSS = 2 * (H * R - F * M) / ((H + M) * (M + R) + (H + F) * (F + R))
+                result["HSS"] = HSS
+            if score_ in ["hk", ""]:
+                # Hanssen-Kuipers Discriminant
+                HK = POD - FA
+                result["HK"] = HK
+            if score_ in ["gss", "ets", ""]:
+                # Gilbert Skill Score
+                GSS = (POD - FA) / ((1 - s * POD) / (1 - s) + FA * (1 - s) / s)
+                if score_ == "ets":
+                    result["ETS"] = GSS
+                else:
+                        result["GSS"] = GSS
+            if score_ in ["sedi", ""]:
+                # Symmetric extremal dependence index
+                SEDI = (np.log(FA) - np.log(POD) + np.log(1 - POD) - np.log(1 - FA)) / (
+                    np.log(FA) + np.log(POD) + np.log(1 - POD) + np.log(1 - FA)
+                )
+                result["SEDI"] = SEDI
+            if score_ in ["mcc", ""]:
+                # Matthews correlation coefficient
+                MCC = (H * R - F * M) / np.sqrt((H + F) * (H + M) * (R + F) * (R + M))
+                result["MCC"] = MCC
+            if score_ in ["f1", ""]:
+                # F1 score
+                F1 = 2 * H / (2 * H + F + M)
+                result["F1"] = F1
+
+        return result
+    
+    
+    
+    
+def score_matrix(y_true, y_probs, name_score):
+    """function to get a matrix-score
+        Args: y_true: observations
+              y_probs: prediction
+              name_score: the score to be estimated""""
+    
+    score_matrix = np.zeros(y_probs.shape[1:3])
+    for i_lat in range(y_probs.shape[1]):
+        for i_lon in range(y_probs.shape[2]):
+            temp = get_scores(y_true[:, i_lat, i_lon], y_probs[:, i_lat, i_lon], [name_score])
+            score_matrix[i_lat, i_lon] = temp[name_score]
+    return score_matrix
