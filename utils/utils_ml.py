@@ -641,10 +641,11 @@ def get_scores(true, pred, scores):
     
     
 def score_matrix(y_true, y_probs, name_score):
+    
     """function to get a matrix-score
         Args: y_true: observations
               y_probs: prediction
-              name_score: the score to be estimated""""
+              name_score: the score to be estimated"""
     
     score_matrix = np.zeros(y_probs.shape[1:3])
     for i_lat in range(y_probs.shape[1]):
