@@ -70,7 +70,7 @@ def plot_hist(history):
     plt.show()
 
     
-def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None):
+def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None, show_colorbar=True):
     """ Plotting a map with the provided values and the country boundaries."""
     
     # Load country outlines
@@ -82,4 +82,5 @@ def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None):
     ax.set_ylim(min(lats), max(lats))
     if title:
         ax.set_title(title)
-    plt.colorbar(im, ax=ax)
+    if show_colorbar:
+        plt.colorbar(im, ax=ax)
