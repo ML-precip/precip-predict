@@ -121,10 +121,10 @@ def load_data(i_vars, i_paths, G, PATH_ERA5, DATE_START, DATE_END, LONS, LATS, L
     l_vars = []
     for iv in range(0,len(i_vars)):
         
-        if i_vars[iv] == 't2m':
-            vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'Grid1_Daymean_era5_T2M_EU_19790101-20211231.nc', DATE_START, DATE_END, LONS, LATS)
-        else:
-            vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'*nc', DATE_START, DATE_END, LONS, LATS)
+       # if i_vars[iv] == 't2m':
+       #     vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'Grid1_Daymean_era5_T2M_EU_19790101-20211231.nc', DATE_START, DATE_END, LONS, LATS)
+       # else:
+        vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'*nc', DATE_START, DATE_END, LONS, LATS)
          
         if i_vars[iv] == 'z':
             vv = vv.sel(level=LEVELS)

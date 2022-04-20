@@ -5,9 +5,18 @@ from keras.layers import Dense,LSTM,Conv2D, BatchNormalization,Flatten, MaxPooli
 from keras.layers import Conv2DTranspose,Concatenate,UpSampling2D,Cropping2D
 from keras.layers import Input, Lambda, Reshape, Dropout, Activation, ZeroPadding2D
 
-from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, MaxPool2D, Conv2DTranspose, Concatenate, Input
+from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, MaxPool2D, Conv2DTranspose, Concatenate, ConvLSTM2D
+from tensorflow.keras.layers import Dense, Dropout, MaxPooling2D, Flatten, MaxPool3D, UpSampling2D
+from tensorflow.keras.layers import Conv2DTranspose, Flatten, Reshape, Cropping2D, Embedding, BatchNormalization,ZeroPadding2D
+from tensorflow.keras.layers import LeakyReLU, Activation, Input, add, multiply
+from tensorflow.keras.layers import concatenate, Dropout, SpatialDropout2D
 from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.layers import Lambda
+import tensorflow.keras.backend as K
 
+import numpy as np
 
 def crop_output(u1,c1):
     # u1: layer with the wanted shapes
@@ -20,7 +29,9 @@ def crop_output(u1,c1):
     if dh < 0 or dw < 0:
         raise('Negative values in output cropping')
             
-    crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
+    # crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
+    # for python 3.6 need to add int
+    crop = Cropping2D(cropping=((int(dh//2), int(dh-dh//2)), (int(dw//2), int(dw-dw//2))))(c1)
     return(crop)
     
     
@@ -123,16 +134,20 @@ def Unet1(input_s, num_filters, ks, activation):
 # Encoder part
 def build_encoder_block(previous_layer, filters, activation, use_batchnorm, dropout):
     """Encoder part for the class Unet2"""
-    c = Conv2D(filters, (3, 3), activation=activation,
-             kernel_initializer='he_normal', padding='same')(previous_layer)
+    # change the order layers to batchnormalization, activation and droput
+    c = Conv2D(filters, (3, 3), kernel_initializer='he_normal', padding='same')(previous_layer)
+    
     if use_batchnorm:
         c = BatchNormalization()(c)
+    c = Activation(activation)(c)
     if dropout:
-        c = Dropout(0.2)(c)
-    c = Conv2D(filters, (3, 3), activation=activation,
-                kernel_initializer='he_normal', padding='same')(c)
+        #c = Dropout(0.2)(c)
+        c = SpatialDropout2D(0.3)(c)
+    c = Conv2D(filters, (3, 3), kernel_initializer='he_normal', padding='same')(c)
     if use_batchnorm:
         c = BatchNormalization()(c)
+        
+    c = Activation(activation)(c) 
     p = MaxPooling2D((2, 2))(c)
 
     return c, p
@@ -146,17 +161,38 @@ def build_decoder_block(previous_layer, skip_layer, is_last, filters, activation
    
     skip_layer= crop_output(u, skip_layer)    
     u = Concatenate()([u, skip_layer])
-    c = Conv2D(filters, (3, 3), activation=activation, 
-               kernel_initializer='he_normal', padding='same')(u)
+    c = Conv2D(filters, (3, 3), kernel_initializer='he_normal', padding='same')(u)
     if use_batchnorm:
         c = BatchNormalization()(c)
+    c = Activation(activation)(c)
     if dropout:
         c = Dropout(0.2)(c)
-    c = Conv2D(filters, (3, 3), activation=activation, 
+    c = Conv2D(filters, (3, 3), 
                kernel_initializer='he_normal', padding='same')(c)
     if use_batchnorm and not is_last:
         c = BatchNormalization()(c)
+    c = Activation(activation)(c) 
 
+    return c
+
+#decoder-convlstm
+def build_decoder_convlstm(previous_layer, skip_layer, N, M, filters):
+    """decoder part adding convlstm
+       after the first upsampling, we need to reshape the up and the skip layer, and then concatenate both"""
+    up = Conv2DTranspose(filters, kernel_size=2, strides=2, padding='same',kernel_initializer = 'he_normal')(previous_layer)
+    up = BatchNormalization(axis=3)(up)
+    up = Activation('relu')(up)
+
+    xx1 = Reshape(target_shape=(1, N, M, filters))(skip_layer)
+    xx2 = Reshape(target_shape=(1, N, M, filters))(up)
+    # merge both previous layers, so the input to convlstm takes 2-"times" 
+    merge = concatenate([xx1,xx2], axis = 1)  # from here the output (None, 2, 64, 64, 256)
+    merge = ConvLSTM2D(filters, kernel_size=(3, 3), padding='same', return_sequences = False, 
+                       go_backwards = True,kernel_initializer = 'he_normal' )(merge)
+            
+    c = Conv2D(filters, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(merge)
+    c = Conv2D(filters, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(c)
+    
     return c
 
 
@@ -222,18 +258,105 @@ def get_size_for(stride_factor):
     return next_shape
 
 
+   
+    
+#U-Net with Attention gates
+# Based on Oktay et al. 2018:Attention U-Net: Learning Where to Look for the Pancreas, https://arxiv.org/abs/1804.03999
+# from https://github.com/lixiaolei1982/Keras-Implementation-of-U-Net-R2U-Net-Attention-U-Net-Attention-R2U-Net.-/blob/master/network.py
+# Main idea behind: https://towardsdatascience.com/a-detailed-explanation-of-the-attention-u-net-b371a5590831
+# The attention gates are implemented in the skip connections so some activations are suppressed in irrelevant regions
+# It is used additive soft attention
+def up_and_concate(down_layer, layer, data_format='channels_last'):
+    
+    if data_format == 'channels_first':
+        in_channel = down_layer.get_shape().as_list()[1]
+    else:
+        in_channel = down_layer.get_shape().as_list()[3]
+
+    up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
+        #up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
+
+    if data_format == 'channels_first':
+        my_concat = Lambda(lambda x: K.concatenate([x[0], x[1]], axis=1))
+    else:
+        my_concat = Lambda(lambda x: K.concatenate([x[0], x[1]], axis=3))
+
+    concate = my_concat([up, layer])
+
+    return concate
+
+
+def attention_block_2d(x, g, inter_channel, data_format='channels_last'):
+    # x has higher dimensions, while g has lower dimensions 
+    # theta_x(?,g_height,g_width,inter_channel)
+     
+    theta_x = Conv2D(inter_channel, [1, 1], strides=[1, 1], data_format=data_format)(x)
+
+    # phi_g(?,g_height,g_width,inter_channel)
+
+    phi_g = Conv2D(inter_channel, [1, 1], strides=[1, 1], data_format=data_format)(g)
+
+    # f(?,g_height,g_width,inter_channel)
+    # The two vectors are summed element-wise.
+    f = Activation('relu')(add([theta_x, phi_g]))
+
+    # psi_f(?,g_height,g_width,1)
+
+    psi_f = Conv2D(1, [1, 1], strides=[1, 1], data_format=data_format)(f)
+
+    rate = Activation('sigmoid')(psi_f)
+
+    # rate(?,x_height,x_width)
+
+    # att_x(?,x_height,x_width,x_channel)
+
+    att_x = multiply([x, rate])
+
+    return att_x
+
+def attention_up_and_concate(down_layer, layer, data_format='channels_last'):
+    if data_format == 'channels_first':
+        in_channel = down_layer.get_shape().as_list()[1]
+    else:
+        in_channel = down_layer.get_shape().as_list()[3]
+
+    up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
+    # up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
+
+    layer = attention_block_2d(x=layer, g=up, inter_channel=in_channel // 4, data_format=data_format)
+
+    if data_format == 'channels_first':
+        my_concat = Lambda(lambda x: K.concatenate([x[0], x[1]], axis=1))
+    else:
+        my_concat = Lambda(lambda x: K.concatenate([x[0], x[1]], axis=3))
+
+    concate = my_concat([up, layer])
+    return concate
+
+
 
 class Unet2():
     """Similar to Unet1 but using batchnorm- dropout
        the decoder part uses Conv2DTranspose"""
     # Adapted from https://github.com/nikhilroxtomar/Unet-for-Person-Segmentation/blob/main/model.py
-    def __init__(self, input_s, output_size, output_channels, num_filters, use_batchnorm, dropout):
+    def __init__(self, arch, input_s, output_size, output_channels, num_filters, use_batchnorm, dropout, depth =3):
         self.input_s = input_s
         self.output_channels = output_channels
         self.output_size = output_size
         self.num_filters = num_filters
         self.use_batchnorm = use_batchnorm
         self.droput = dropout
+        self.depth = depth
+        
+        if arch == 'unet':
+            self.build_model()
+        elif arch == 'unet-convlstm':
+            self.build_UnetConvLSTM()
+        elif arch == 'unet-att':
+            self.att_unet()
+        else:
+            raise('The model is not defined')
+            self.build_model()
         
     def build_model(self):
     
@@ -262,3 +385,80 @@ class Unet2():
         u_model = Model(inputs=inputs,outputs=output_layer)
 
         return(u_model)
+    
+    
+    def build_UnetConvLSTM(self):
+    
+        inputs = Input(self.input_s)
+        # Additional padding if needed 
+        x = padding_block(inputs, factor=16)
+        N = x.get_shape()[1]
+        M = x.get_shape()[2]
+        # depth =3 (it can be modified)    
+        x1, pp1 = build_encoder_block(x, self.num_filters*2,  "relu", self.use_batchnorm, self.droput)
+        x2, pp2 = build_encoder_block(pp1, self.num_filters*4,  "relu", self.use_batchnorm, self.droput)
+        x3, pp3 = build_encoder_block(pp2, self.num_filters*8,  "relu", self.use_batchnorm, self.droput)
+
+        tb = build_bottleneck(pp3, self.num_filters*32, "relu", True, True)
+
+        dd1 = build_decoder_convlstm(tb, x3, np.int32(N/4), np.int32(M/4), self.num_filters*8)
+        dd2 = build_decoder_convlstm(dd1, x2, np.int32(N/2), np.int32(M/2), self.num_filters*4)
+        dd3 = build_decoder_convlstm(dd2, x1, N, M, self.num_filters*2)
+        
+        conv = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = 'he_normal')(dd3)
+
+        output_function = 'softmax' if self.output_channels > 1 else 'sigmoid'
+        output_layer     = Conv2D(self.output_channels, (1, 1),
+                                         activation=output_function)(conv)
+        # Additional cropping
+        
+        output_layer = crop_output(inputs,output_layer)
+        u_model = Model(inputs=inputs,outputs=output_layer)
+
+        return(u_model)
+    
+
+    def att_unet(self):
+     #def att_unet(i_shape, depth, nfilters, data_format='channels_last'):
+
+        inputs = Input(self.input_s)
+        # We need to add the extra padding
+        x = padding_block(inputs, factor=16)
+
+        #depth = 3
+        skips = []
+        for i in range(self.depth):
+
+            x = Conv2D(self.num_filters, 3, activation=LeakyReLU(), padding='same')(x)
+            x = Dropout(0.2)(x) # increase drop 
+            #x = InstanceNormalization()(x)
+            x = Conv2D(self.num_filters, 3, activation=LeakyReLU(), padding='same')(x)
+            #x = InstanceNormalization()(x)
+            skips.append(x)
+            x = MaxPooling2D(2)(x)
+            nfilters = self.num_filters * 2
+
+        x = Conv2D(nfilters, (3, 3), activation=LeakyReLU(), padding='same')(x)
+        x = Dropout(0.2)(x)
+        # x = InstanceNormalization()(x)
+        x = Conv2D(nfilters, (3, 3), activation=LeakyReLU(), padding='same')(x)
+        #x = InstanceNormalization()(x)
+
+        for i in reversed(range(self.depth)):
+            nfilters = nfilters // 2
+            x = attention_up_and_concate(x, skips[i], data_format='channels_last')
+            x = Conv2D(nfilters, (3, 3), activation=LeakyReLU(), padding='same')(x)
+            x = Dropout(0.2)(x)
+            #x = InstanceNormalization()(x)
+            x = Conv2D(nfilters, (3, 3), activation=LeakyReLU(), padding='same')(x)
+            #x = InstanceNormalization()(x)
+
+        conv6 = Conv2D(1, (1, 1), padding='same')(x)
+        conv7 = Activation('sigmoid')(conv6)
+        # cropping 
+        output_layer = crop_output(inputs,conv7)
+        # conv7 = Activation('tanh')(conv6)
+        model = Model(inputs=inputs, outputs=output_layer)
+
+        #model.compile(optimizer=Adam(lr=1e-5), loss=[focal_loss()], metrics=['accuracy', dice_coef])
+        return model
