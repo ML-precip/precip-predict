@@ -304,7 +304,7 @@ class DataGeneratorWithExtremes(keras.utils.Sequence):
             if levels is None:
                 data.append(X[var].expand_dims({'level': generic_level}, 1)) 
             else:
-                data.append(X[var])
+                data.append(X[var].sel(level=levels))
 
         self.X = xr.concat(data, 'level').transpose('time', 'lat', 'lon', 'level')
         self.mean = self.X.mean(('time', 'lat', 'lon')).compute() if mean is None else mean
