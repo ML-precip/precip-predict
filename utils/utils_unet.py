@@ -1,20 +1,25 @@
 from keras.models import Sequential
 from keras.layers.wrappers import TimeDistributed
 from keras.models import Sequential
-from keras.layers import Dense,LSTM,Conv2D, BatchNormalization,Flatten, MaxPooling2D
-from keras.layers import Conv2DTranspose,Concatenate,UpSampling2D,Cropping2D
-from keras.layers import Input, Lambda, Reshape, Dropout, Activation, ZeroPadding2D
+from keras.layers import Dense,Conv2D, BatchNormalization,Flatten, MaxPooling2D, MaxPool2D
+from keras.layers import Conv2DTranspose,Concatenate,UpSampling2D, ConvLSTM2D
+from keras.layers import Input, Lambda, Reshape, Dropout, Activation, ZeroPadding2D, SpatialDropout2D, concatenate
+from keras.layers.convolutional import Cropping2D
+from keras.layers import LeakyReLU, add, multiply
+from keras.models import Model
 
-from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, MaxPool2D, Conv2DTranspose, Concatenate, ConvLSTM2D
-from tensorflow.keras.layers import Dense, Dropout, MaxPooling2D, Flatten, MaxPool3D, UpSampling2D
-from tensorflow.keras.layers import Conv2DTranspose, Flatten, Reshape, Cropping2D, Embedding, BatchNormalization,ZeroPadding2D
-from tensorflow.keras.layers import LeakyReLU, Activation, Input, add, multiply
-from tensorflow.keras.layers import concatenate, Dropout, SpatialDropout2D
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.optimizers import SGD
-from tensorflow.keras.layers import Lambda
-import tensorflow.keras.backend as K
+from keras import backend as K
+
+#from tensorflow.keras.layers import Conv2D, BatchNormalization, Activation, MaxPool2D, Conv2DTranspose, Concatenate, ConvLSTM2D
+#from tensorflow.keras.layers import Dense, Dropout, MaxPooling2D, Flatten, MaxPool3D, UpSampling2D
+#from tensorflow.keras.layers import Conv2DTranspose, Flatten, Reshape, Cropping2D, Embedding, BatchNormalization,ZeroPadding2D
+#from tensorflow.keras.layers import LeakyReLU, Activation, Input, add, multiply
+#from tensorflow.keras.layers import concatenate, Dropout, SpatialDropout2D
+#from tensorflow.keras.models import Model
+#from tensorflow.keras.optimizers import Adam
+#from tensorflow.keras.optimizers import SGD
+#from tensorflow.keras.layers import Lambda
+#import tensorflow.keras.backend as K
 
 import numpy as np
 
@@ -29,9 +34,10 @@ def crop_output(u1,c1):
     if dh < 0 or dw < 0:
         raise('Negative values in output cropping')
             
-    # crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
-    # for python 3.6 need to add int
+     #crop = Cropping2D(cropping=((dh//2, dh-dh//2), (dw//2, dw-dw//2)))(c1)
+     # for python 3.6 need to add int
     crop = Cropping2D(cropping=((int(dh//2), int(dh-dh//2)), (int(dw//2), int(dw-dw//2))))(c1)
+    
     return(crop)
     
     
@@ -156,10 +162,13 @@ def build_encoder_block(previous_layer, filters, activation, use_batchnorm, drop
 # decoder part
 def build_decoder_block(previous_layer, skip_layer, is_last, filters, activation, use_batchnorm, dropout):
     """Decoder part for the class Unet2"""
-    u = Conv2DTranspose(filters, (2, 2), strides=(2, 2), 
-                        padding='same')(previous_layer)
+   # u = Conv2DTranspose(filters, (2, 2), strides=(2, 2), 
+    #                    padding='same')(previous_layer)
    
-    skip_layer= crop_output(u, skip_layer)    
+    # Need to change Conv2DTranspose: for some weeeeeird behaviour the use of conv2DTranspose returns an invalid shape!!!!
+    u = UpSampling2D((2,2))(previous_layer)
+    
+   # skip_layer= crop_output(u, skip_layer)    
     u = Concatenate()([u, skip_layer])
     c = Conv2D(filters, (3, 3), kernel_initializer='he_normal', padding='same')(u)
     if use_batchnorm:
@@ -272,9 +281,9 @@ def up_and_concate(down_layer, layer, data_format='channels_last'):
         in_channel = down_layer.get_shape().as_list()[1]
     else:
         in_channel = down_layer.get_shape().as_list()[3]
-
-    up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
-        #up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
+    #change this to overcome the innvestigate issue with keras* (need to make sure of this)
+    #up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
+        up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
 
     if data_format == 'channels_first':
         my_concat = Lambda(lambda x: K.concatenate([x[0], x[1]], axis=1))
@@ -319,9 +328,9 @@ def attention_up_and_concate(down_layer, layer, data_format='channels_last'):
         in_channel = down_layer.get_shape().as_list()[1]
     else:
         in_channel = down_layer.get_shape().as_list()[3]
-
-    up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
-    # up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
+    # Update!
+    # up = Conv2DTranspose(in_channel, [2, 2], strides=[2, 2])(down_layer)
+    up = UpSampling2D(size=(2, 2), data_format=data_format)(down_layer)
 
     layer = attention_block_2d(x=layer, g=up, inter_channel=in_channel // 4, data_format=data_format)
 
@@ -377,6 +386,7 @@ class Unet2():
         dd4 = build_decoder_block(dd3, x1, True, self.num_filters*2,"relu", self.use_batchnorm, self.droput)
 
         output_function = 'softmax' if self.output_channels > 1 else 'sigmoid'
+        print(output_function)
         output_layer     = Conv2D(self.output_channels, (1, 1),
                                          activation=output_function)(dd4)
         # Additional cropping

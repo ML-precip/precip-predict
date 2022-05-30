@@ -1,0 +1,6 @@
+Workspace environment set for:
+   /storage/workspaces/giub_hydro/hydro 
+2022-05-29 18:13:40.657654: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+srun: Job step aborted: Waiting up to 62 seconds for job step to finish.
+slurmstepd: error: *** STEP 29631621.0 ON gnode16 CANCELLED AT 2022-05-29T18:40:37 ***
+slurmstepd: error: *** JOB 29631621 ON gnode16 CANCELLED AT 2022-05-29T18:40:37 ***

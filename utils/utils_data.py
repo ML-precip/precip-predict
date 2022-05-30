@@ -4,7 +4,7 @@ import pandas as pd
 import geopandas as gpd
 import dask
 import datetime
-from dotenv import dotenv_values
+#from dotenv import dotenv_values
 
 def rename_dimensions_variables(ds):
     """Rename dimensions and attributes of the given dataset to homogenize data."""
@@ -126,11 +126,11 @@ def load_data(i_vars, i_paths, G, PATH_ERA5, DATE_START, DATE_END, LONS, LATS, L
        # else:
         vv = get_era5_data(PATH_ERA5 + i_paths[iv] +'*nc', DATE_START, DATE_END, LONS, LATS)
          
+        if i_vars[iv] != 'tpcw':
+            vv = vv.sel(level=LEVELS)
+            
         if i_vars[iv] == 'z':
-            vv = vv.sel(level=LEVELS)
             vv.z.values = vv.z.values/G
-        elif i_vars[iv] == 'rh':
-            vv = vv.sel(level=LEVELS)
             
         vv['time'] = pd.DatetimeIndex(vv.time.dt.date)
     
