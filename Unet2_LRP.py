@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
-
 # Important to note:!
 # The use of innvestigate requires specific versions of python and keras
 # The model must be built according to the versions, so the weights are saved separately
 # import necesssary libaries
+
+# Calculate LRP for U-Net 
+
 from pathlib import Path
 import pathlib
 import warnings
@@ -49,14 +49,8 @@ with warnings.catch_warnings():
     from keras.initializers import glorot_uniform
 
 
-# In[2]:
-
-
 import yaml
 conf = yaml.safe_load(open("config.yaml"))
-
-
-# In[3]:
 
 
 #load the model again
