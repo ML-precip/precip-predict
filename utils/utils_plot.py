@@ -153,7 +153,7 @@ def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, plot=True):
     # To control the space
     plt.subplots_adjust(right=0.8, wspace=-0.6, hspace=0.2)
     if plot:
-        plt.savefig('figures/' + fname + '.png')
+        plt.savefig('figures/' + fname + '.pdf')
     else:
         
         plt.draw()
