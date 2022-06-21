@@ -107,29 +107,7 @@ def plot_relevances(rel):
         vals = rel[:,:,i]
         plot_map(ax, lons_x, lats_y, vals, title=str(n_tit[i]))
 
-        
-def plot_xr_rel(rel, lats_y,lons_x, vnames, fname):
-    
-    mx= xr.DataArray(rel, dims=["lat", "lon", "variable"],
-                  coords=dict(lat = lats_y, 
-            lon = lons_x, variable= vnames ))
-    
-    g = mx.plot.pcolormesh("lon", "lat", col="variable", col_wrap=4, robust=True, cmap='Reds',
-    yincrease = False, extend='max',
-    figsize=(14, 14),  cbar_kwargs={"orientation": "vertical", "shrink": 0.8, "aspect": 50})
-    #figsize=(14, 12)
-    for ax, title in zip(g.axes.flat, vnames):
 
-        world = gpd.read_file(gpd.datasets.get_path('naturalearth_lowres'))
-        world.boundary.plot(ax=ax, lw=1, color='k')
-        ax.set_xlim(min(lons_x), max(lons_x))
-        ax.set_title(title)
-        ax.set_ylim(min(lats_y), max(lats_y))
-
-    plt.draw()
-    plt.savefig('figures/' + fname + '.pdf')
-    
-    
     
 def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, plot=True):
     
