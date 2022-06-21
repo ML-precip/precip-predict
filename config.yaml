@@ -1,0 +1,27 @@
+# config file
+
+variables: [z,tm,rh,u,v,tpcw]
+levels: [300,500,700,850,925,1000]
+
+varnames: [Z300, Z500, Z700, Z850, Z925, Z1000,
+T300, T500, T700, T850, T925, T1000,
+RH300, RH500, RH700, RH850, RH925, RH1000,
+U300, U500, U700, U850, U925, U1000,
+V300, V500, V700, V850, V925, V1000,
+TPWC]
+
+model : 'unet'
+
+i_shape : [46,56,31]
+o_shape : [46,46,1]
+
+output_channels : 1
+num_filters : 32
+use_batchnorm : True
+dropout : True
+lr : 0.0004
+    
+    
+    
+output_scaling : 1
+output_crop : None    
