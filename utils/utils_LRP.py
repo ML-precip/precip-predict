@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 
-def calLRP(X, model, lrpRule):
+def calLRP(X, model, lrpRule, only_positive=True):
     """Calculate the LRP based on the innvestigate available methods
        Args: X array-4D
              lrpRule: method to apply"""
@@ -40,7 +40,8 @@ def calLRP(X, model, lrpRule):
             deepMaps[i] = analyzer_output/np.sum(analyzer_output.flatten())
 
     ### Save only the positive contributions
-            deepMaps[np.where(deepMaps < 0)] = 0.
+            if only_positive:
+                deepMaps[np.where(deepMaps < 0)] = 0.
            
     return deepMaps
 

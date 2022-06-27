@@ -85,7 +85,8 @@ def plot_map(ax, lons, lats, vals, title=None, vmin=None, vmax=None, cmap=None, 
     if title:
         ax.set_title(title)
     if show_colorbar:
-        plt.colorbar(im, ax=ax)
+        # adding more settings to the colorbar to control aspect
+        plt.colorbar(im, ax=ax, shrink=.5, pad=.1, aspect=8)
 
         
         
@@ -109,14 +110,14 @@ def plot_relevances(rel):
 
 
     
-def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, plot=True):
+def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, cmap='Reds', plot=True):
     
     
     mx= xr.DataArray(rel, dims=["lat", "lon", "variable"],
                   coords=dict(lat = lats_y, 
             lon = lons_x, variable= vnames ))
     
-    g = mx.plot.pcolormesh("lon", "lat", col="variable", col_wrap=4, robust=True, cmap='Reds',
+    g = mx.plot.pcolormesh("lon", "lat", col="variable", col_wrap=4, robust=True, cmap=cmap,
     yincrease = False, extend='max',
     figsize=(14, 14),  cbar_kwargs={"orientation": "vertical", "shrink": 0.9, "aspect": 50})
     #figsize=(14, 12)
