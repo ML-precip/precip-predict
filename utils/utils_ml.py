@@ -415,7 +415,8 @@ def datanormalise(ds, yy, var_dict, mean=None, std=None, shuf=False, extend_dim 
     std = data.std('time').mean(('lat', 'lon')).compute() if std is None else std
     # Normalize
     data = (data - mean) / std
-    y = np.array(yy)
+    #y = np.array(yy)
+    y = yy
     np_data = np.array(data)
 
     
@@ -429,7 +430,7 @@ def datanormalise(ds, yy, var_dict, mean=None, std=None, shuf=False, extend_dim 
         np_data = tf.expand_dims(np_data, -1)
         y = tf.expand_dims(y, -1)    
     
-    return np_data, y, mean, std
+    return data, y, mean, std
     
     
             
