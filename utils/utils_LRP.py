@@ -24,13 +24,22 @@ def calLRP(X, model, lrpRule, only_positive=True):
     # Inizialize the method
     
     if lrpRule == 'a1b0':
-        analyzer = innvestigate.analyzer.relevance_based.relevance_analyzer.LRPAlpha1Beta0(model)
+        #analyzer = innvestigate.analyzer.relevance_based.relevance_analyzer.LRPAlpha1Beta0(model)
+        analyzer = innvestigate.create_analyzer('lrp.alpha_beta', model, alpha=1,beta=0)
     elif lrpRule == 'epsilon':
         analyzer = innvestigate.analyzer.relevance_based.relevance_analyzer.LRPEpsilon(model)
+    elif lrpRule == 'lrpz':
+        #analyzer = innvestigate.analyzer.relevance_based.relevance_analyzer.LRPZ(model)
+        analyzer = innvestigate.create_analyzer('lrp.z', model)
     elif lrpRule == 'gradient':
         analyzer = innvestigate.create_analyzer('gradient', model)
     elif lrpRule == 'deep_taylor':
         analyzer = innvestigate.create_analyzer('deep_taylor', model)
+    elif lrpRule == 'comp':
+        analyzer = innvestigate.create_analyzer('lrp.sequential_preset_a', model)
+    elif lrpRule == 'compflat':
+        analyzer = innvestigate.create_analyzer('lrp.sequential_preset_a_flat', model)
+
         
     
     ### Analyze each input via the analyzer
