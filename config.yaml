@@ -13,7 +13,7 @@ TPWC]
 model : 'unet'
 
 i_shape : [46,56,31]
-o_shape : [46,46,1]
+o_shape : [46,56,1]
 
 output_channels : 1
 num_filters : 32

@@ -177,7 +177,7 @@ print('analysing LRPcompflat')
 # Use the innevestigate tool
 lrpcompflat_test = calLRP(dg_test_X,m.model, 'compflat', only_positive=False)
 print('saving LRPcompflat')
-np.save('tmp/LRP/lrpcompflat_test_DNN_UNET4.npy',lrpz_test)
+np.save('tmp/LRP/lrpcompflat_test_DNN_UNET4.npy',lrpcompflat_test)
 
 
 #gradient_LRP_train = calLRP(dg_train_X,m.model, 'gradient' )
@@ -192,3 +192,35 @@ np.save('tmp/LRP/lrpcompflat_test_DNN_UNET4.npy',lrpz_test)
 #print('saving LRP alphabeta')
 #save_rel(a1b0_test, times, lats_y, lons_x, PATH_OUT, 'alphabeta')
 
+
+# Baseline
+
+m0 = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=True,**opt_model_new)
+
+# compile 
+m0.model.compile(loss=keras.losses.categorical_crossentropy, ## instead of CategoricalCrossentropy
+                  optimizer='adam', ## lr instead of learning_rate
+                  metrics=['categorical_accuracy'])
+
+print('loads weigths of NULL model')
+#m.model.summary()
+# load weights
+m0.model.load_weights('tmp/tmp_weights_DNN/UNET4_NULL_pr_trained_weights.h5')
+
+print('analysing Baselines')
+# Use the innevestigate tool
+BS_lrpz_test = calLRP(dg_test_X,m0.model, 'lrpz', only_positive=False)
+print('saving LRPz')
+np.save('tmp/LRP/BS_lrpz_test_DNN_UNET4.npy',BS_lrpz_test)
+
+print('analysing LRPcomp')
+# Use the innevestigate tool
+BS_lrpcomp_test = calLRP(dg_test_X,m0.model, 'comp', only_positive=False )
+print('saving LRP composite')
+np.save('tmp/LRP/BS_lrpcomp_test_DNN_UNET4.npy',BS_lrpcomp_test)
+
+print('analysing LRPcompflat')
+# Use the innevestigate tool
+BS_lrpcompflat_test = calLRP(dg_test_X,m0.model, 'compflat', only_positive=False)
+print('saving LRPcompflat')
+np.save('tmp/LRP/BS_lrpcompflat_test_DNN_UNET4.npy',BS_lrpcompflat_test)
