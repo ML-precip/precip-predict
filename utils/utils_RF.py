@@ -12,9 +12,9 @@ from math import sqrt
 import xarray as xr
 import numpy as np
 
-def train_rf_classifier_model(X, y):
+def train_rf_classifier_model(X, y, max_depth=4):
     try:
-        clf = RandomForestClassifier(max_depth=4, random_state=42, class_weight='balanced').fit(X, y)
+        clf = RandomForestClassifier(max_depth=max_depth, random_state=42, class_weight='balanced').fit(X, y)
         #clf.fit(X, y)
         print('|', end='')
         return clf
@@ -38,9 +38,9 @@ def apply_rf_classifier_model_proba(clf, X):
     except:
         return None
     
-def train_rf_regress_model(X, y):
+def train_rf_regress_model(X, y, max_depth=4):
     try:
-        rgf =  RandomForestRegressor(max_depth=4, random_state=42).fit(X, y)
+        rgf =  RandomForestRegressor(max_depth=max_depth, random_state=42).fit(X, y)
         #clf.fit(X, y)
         print('|', end='')
         return rgf
