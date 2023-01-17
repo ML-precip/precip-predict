@@ -209,18 +209,18 @@ def evaluate_model(test_labels, train_labels, predictions, probs, train_predicti
     
     baseline = {}
     
-    baseline['recall'] = recall_score(test_labels, [1 for _ in range(len(test_labels))])
+    baseline['recall'] = recall_score(test_labels, [1 for _ in range(len(test_labels))], zero_division=1)
     baseline['precision'] = precision_score(test_labels, [1 for _ in range(len(test_labels))])
     baseline['roc'] = 0.5
     
     results = {}
     
-    results['recall'] = recall_score(test_labels, predictions)
+    results['recall'] = recall_score(test_labels, predictions, zero_division=1)
     results['precision'] = precision_score(test_labels, predictions)
     results['roc'] = roc_auc_score(test_labels, probs)
     
     train_results = {}
-    train_results['recall'] = recall_score(train_labels, train_predictions)
+    train_results['recall'] = recall_score(train_labels, train_predictions, zero_division=1)
     train_results['precision'] = precision_score(train_labels, train_predictions)
     train_results['roc'] = roc_auc_score(train_labels, train_probs)
     
@@ -543,7 +543,7 @@ def eval_confusion_matrix_scores_on_map(y_true, y_pred, manual=False):
                 recall_matrix[i_lat, i_lon] = tp / (tp + fn)
             else:
                 precision_matrix[i_lat, i_lon] = precision_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon], zero_division=0)
-                recall_matrix[i_lat, i_lon] = recall_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon])
+                recall_matrix[i_lat, i_lon] = recall_score(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon], zero_division=1)
     
     return precision_matrix, recall_matrix
 
@@ -553,7 +553,10 @@ def eval_roc_auc_score_on_map(y_true, y_probs, manual=False):
     roc_auc_matrix = np.zeros(y_probs.shape[1:3])
     for i_lat in range(y_probs.shape[1]):
         for i_lon in range(y_probs.shape[2]):
-            roc_auc_matrix[i_lat, i_lon] = roc_auc_score(y_true[:, i_lat, i_lon], y_probs[:, i_lat, i_lon])
+            if np.isnan(y_true[0, i_lat, i_lon]):
+                roc_auc_matrix[i_lat, i_lon] = np.nan
+            else:
+                roc_auc_matrix[i_lat, i_lon] = roc_auc_score(y_true[:, i_lat, i_lon], y_probs[:, i_lat, i_lon])
     
     return roc_auc_matrix
 
