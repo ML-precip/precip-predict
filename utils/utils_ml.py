@@ -526,7 +526,14 @@ def eval_confusion_matrix_on_map(y_true, y_pred):
     tp = np.zeros(y_pred.shape[1:3])
     for i_lat in range(y_pred.shape[1]):
         for i_lon in range(y_pred.shape[2]):
-            tn[i_lat, i_lon], fp[i_lat, i_lon], fn[i_lat, i_lon], tp[i_lat, i_lon] = confusion_matrix(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon]).ravel()
+            if np.isnan(y_true[0, i_lat, i_lon]):
+                tn[i_lat, i_lon], fp[i_lat, i_lon], fn[i_lat, i_lon], tp[i_lat, i_lon] = np.nan, np.nan, np.nan, np.nan
+            else:
+                if np.all(y_true[:, i_lat, i_lon] == 0):
+                    # Only zeros
+                    tn[i_lat, i_lon], fp[i_lat, i_lon], fn[i_lat, i_lon], tp[i_lat, i_lon] = np.nan, np.nan, np.nan, np.nan
+                else:
+                    tn[i_lat, i_lon], fp[i_lat, i_lon], fn[i_lat, i_lon], tp[i_lat, i_lon] = confusion_matrix(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon]).ravel()
 
     return tn, fp, fn, tp
 
