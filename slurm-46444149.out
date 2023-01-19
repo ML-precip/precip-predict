@@ -1,0 +1,12 @@
+Workspace environment set for:
+   /storage/workspaces/giub_hydro/hydro 
+2023-01-17 13:48:37.764070: I tensorflow/core/platform/cpu_feature_guard.cc:141] Your CPU supports instructions that this TensorFlow binary was not compiled to use: AVX2 FMA
+X shape: [46, 56, 31]
+y shape: [46, 56, 1]
+loads weigths
+analysing LRP alphabeta
+loads weigths of NULL model
+analysing Baselines
+saving ab0
+saving gradient
+Using TensorFlow backend.
