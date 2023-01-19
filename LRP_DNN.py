@@ -161,34 +161,33 @@ print('loads weigths')
 m.model.load_weights('tmp/tmp_weights_DNN/UNET40.95th_trained_weights.h5')
 
 ####### Analyse different methods###########
-print('analysing LRPz')
+#print('analysing LRPz')
 # Use the innevestigate tool
-lrpz_test = calLRP(dg_test_X,m.model, 'lrpz', only_positive=False)
-print('saving LRPz')
-np.save('tmp/LRP/lrpz_test_DNN_UNET4.npy',lrpz_test)
+#lrpz_test = calLRP(dg_test_X,m.model, 'lrpz', only_positive=False)
+#print('saving LRPz')
+#np.save('tmp/LRP/lrpz_test_DNN_UNET4.npy',lrpz_test)
 
-print('analysing LRPcomp')
+#print('analysing LRPcomp')
 # Use the innevestigate tool
-lrpcomp_test = calLRP(dg_test_X,m.model, 'comp', only_positive=False )
-print('saving LRP composite')
-np.save('tmp/LRP/lrpcomp_test_DNN_UNET4.npy',lrpcomp_test)
+#lrpcomp_test = calLRP(dg_test_X,m.model, 'comp', only_positive=False )
+#print('saving LRP composite')
+#np.save('tmp/LRP/lrpcomp_test_DNN_UNET4.npy',lrpcomp_test)
 
-print('analysing LRPcompflat')
+#print('analysing LRPcompflat')
 # Use the innevestigate tool
-lrpcompflat_test = calLRP(dg_test_X,m.model, 'compflat', only_positive=False)
-print('saving LRPcompflat')
-np.save('tmp/LRP/lrpcompflat_test_DNN_UNET4.npy',lrpcompflat_test)
+#lrpcompflat_test = calLRP(dg_test_X,m.model, 'compflat', only_positive=False)
+#print('saving LRPcompflat')
+#np.save('tmp/LRP/lrpcompflat_test_DNN_UNET4.npy',lrpcompflat_test)
 
 
-#gradient_LRP_train = calLRP(dg_train_X,m.model, 'gradient' )
-#np.save('tmp/LRP/gradient_train_DNN_UNET4.npy',gradient_LRP_train)
+#gradient_LRP_test = calLRP(dg_test_X,m.model, 'gradient' )
+#np.save('tmp/LRP/gradient_test_DNN_UNET4.npy',gradient_LRP_test)
 #save relevances
 #save_rel(aEp_test, times, lats_y, lons_x, PATH_OUT, 'Epsilon')
-#print('analysing LRP alphabeta')
+print('analysing LRP alphabeta')
 #a1b0_train= calLRP(dg_train_X,m.model, 'a1b0' )
-#a1b0_test= calLRP(dg_test_X,m.model, 'a1b0' )
-#save
-#np.save('tmp/LRP/a1b0_test_DNN_UNET4.npy',a1b0_test)
+a1b0_test= calLRP(dg_test_X,m.model, 'a1b0' )
+np.save('tmp/LRP/a1b0_test_DNN_UNET4.npy',a1b0_test)
 #print('saving LRP alphabeta')
 #save_rel(a1b0_test, times, lats_y, lons_x, PATH_OUT, 'alphabeta')
 
@@ -209,18 +208,30 @@ m0.model.load_weights('tmp/tmp_weights_DNN/UNET4_NULL_pr_trained_weights.h5')
 
 print('analysing Baselines')
 # Use the innevestigate tool
-BS_lrpz_test = calLRP(dg_test_X,m0.model, 'lrpz', only_positive=False)
-print('saving LRPz')
-np.save('tmp/LRP/BS_lrpz_test_DNN_UNET4.npy',BS_lrpz_test)
+BS_lrpab0_test = calLRP(dg_test_X,m0.model, 'a1b0', only_positive=False)
+print('saving ab0')
+np.save('tmp/LRP/BS_lrpab0_test_DNN_UNET4.npy',BS_lrpab0_test)
 
-print('analysing LRPcomp')
-# Use the innevestigate tool
-BS_lrpcomp_test = calLRP(dg_test_X,m0.model, 'comp', only_positive=False )
-print('saving LRP composite')
-np.save('tmp/LRP/BS_lrpcomp_test_DNN_UNET4.npy',BS_lrpcomp_test)
+BS_lrpagradient_test = calLRP(dg_test_X,m0.model, 'gradient', only_positive=False)
+print('saving gradient')
+np.save('tmp/LRP/BS_lrpgradient_test_DNN_UNET4.npy',BS_lrpab0_test)
 
-print('analysing LRPcompflat')
+
+
+#print('analysing Baselines')
 # Use the innevestigate tool
-BS_lrpcompflat_test = calLRP(dg_test_X,m0.model, 'compflat', only_positive=False)
-print('saving LRPcompflat')
-np.save('tmp/LRP/BS_lrpcompflat_test_DNN_UNET4.npy',BS_lrpcompflat_test)
+#BS_lrpz_test = calLRP(dg_test_X,m0.model, 'lrpz', only_positive=False)
+#print('saving LRPz')
+#np.save('tmp/LRP/BS_lrpz_test_DNN_UNET4.npy',BS_lrpz_test)
+
+#print('analysing LRPcomp')
+# Use the innevestigate tool
+#BS_lrpcomp_test = calLRP(dg_test_X,m0.model, 'comp', only_positive=False )
+#print('saving LRP composite')
+#np.save('tmp/LRP/BS_lrpcomp_test_DNN_UNET4.npy',BS_lrpcomp_test)
+
+#print('analysing LRPcompflat')
+# Use the innevestigate tool
+#BS_lrpcompflat_test = calLRP(dg_test_X,m0.model, 'compflat', only_positive=False)
+#print('saving LRPcompflat')
+#np.save('tmp/LRP/BS_lrpcompflat_test_DNN_UNET4.npy',BS_lrpcompflat_test)
