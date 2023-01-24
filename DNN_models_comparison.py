@@ -399,7 +399,7 @@ if train_for_prec:
             loss_fct = 'mse'
             if loss_regression == 'mse_nans':
                 loss_fct = MeanSquaredErrorNans()
-            m.compile(
+            m.model.compile(
                 loss=loss_fct, 
                 metrics=[loss_fct], 
                 optimizer=optimizer
@@ -407,11 +407,11 @@ if train_for_prec:
             print(f'Number of parameters: {m.model.count_params()}')
 
             # Train
-            hist = m.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
+            hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
         
             # Saving the model
             print('Saving weights')
-            m.save.weights(f'tmp/keras/{model}.h5')
+            m.model.save.weights(f'tmp/keras/{model}.h5')
         
         
 if train_for_xtrm:
@@ -450,17 +450,17 @@ if train_for_xtrm:
         else:
             # Create the model and compile
             m = DeepFactory(model, i_shape, o_shape, for_extremes=True, **opt_model_new)
-            m.compile(
+            m.model.compile(
                 loss=xtrm_loss,
                 optimizer=optimizer
             )
             print(f'Number of parameters: {m.model.count_params()}')
 
             # Train
-            hist = m.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
+            hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
             
            
             # Saving the model
-            m.save.weights(f'tmp/keras/{model}_xtrm.h5')
+            m.model.save.weights(f'tmp/keras/{model}_xtrm.h5')
         
        
