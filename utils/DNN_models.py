@@ -19,7 +19,7 @@ class DeepFactory_Keras():
 
     def __init__(self, arch, input_size, output_size, for_extremes=False, latent_dim=128, 
                  dropout_rate=0.2, use_batch_norm=True, inner_activation='relu', unet_filters_nb=64, 
-                 unet_depth=4, unet_use_upsample=True, output_scaling=1, output_crop=None):
+                 unet_depth=4, use_upsample=True, output_scaling=1, output_crop=None):
         super(DeepFactory_Keras, self).__init__()
         self.arch = arch
         self.input_size = list(input_size)
@@ -28,7 +28,7 @@ class DeepFactory_Keras():
         self.latent_dim = latent_dim
         self.dropout_rate = dropout_rate
         self.use_batch_norm = use_batch_norm
-        self.unet_use_upsample = unet_use_upsample
+        self.use_upsample = use_upsample
         self.inner_activation = inner_activation
         self.unet_depth = unet_depth
         self.unet_filters_nb = unet_filters_nb
@@ -310,7 +310,7 @@ class DeepFactory_Keras():
         if activation == 'default':
             activation = self.inner_activation
         
-        if self.unet_use_upsample:
+        if self.use_upsample:
             x = UpSampling2D((2, 2))(input)
         else:
             if initializer == 'default':
