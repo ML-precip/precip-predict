@@ -133,3 +133,4 @@ tmp/
 figures/
 
 *.out
+*.csv
