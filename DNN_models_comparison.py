@@ -64,10 +64,10 @@ LATS_INPUT = [30, 75]
 LONS_PREC = [-25, 30]
 LATS_PREC = [30, 75]
 BATCH_SIZE = 64
-PRECIP_DATA = 'E-OBS' # Options: ERA5-hi, ERA5-low, E-OBS
+PRECIP_DATA = 'ERA5-low' # Options: ERA5-hi, ERA5-low, E-OBS
 PRECIP_XTRM = 0.95 # Percentile (threshold) for the extremes
 USE_3D_ONLY = False
-
+CREATE_MASK_EOBS = False
 
 # Load precipitation
 if PRECIP_DATA == 'ERA5-hi':
@@ -95,6 +95,23 @@ pr_xtrm = pr_xtrm*1 # Transform to number
 # Extract coordinates for precip
 lats_y = pr.lat.to_numpy()
 lons_y = pr.lon.to_numpy()
+
+# Create mask
+mask = None
+if CREATE_MASK_EOBS:
+    if PRECIP_DATA in ['E-OBS', 'EOBS']:
+        peobs = pr[:,:,:,0]
+    else:
+        peobs = get_nc_data(PATH_EOBS + '/eobs_1deg_v26.0e.nc', DATE_START, DATE_END, LONS_PREC, LATS_PREC)
+        peobs = peobs.rr
+        if peobs.lat[0].values < peobs.lat[1].values:
+            peobs = peobs.reindex(lat=list(reversed(peobs.lat)))
+    mask = np.isnan(peobs[0,:,:])
+    mask = np.invert(mask)
+    mask.plot()
+    mask = mask.to_numpy()
+    
+    
 
 ## Input data: meteorological fields
 # Load geopotential height
@@ -351,8 +368,11 @@ train_for_prec = True
 train_for_xtrm = True
 history_log_level = 1
 
-#loss_regression = 'mse'
-loss_regression = 'mse_nans'
+# define loss function
+if PRECIP_DATA in ['E-OBS', 'EOBS']:
+    loss_regression = 'mse_nans'
+else:
+    loss_regression = 'mse'
 
 models_prec = []
 models_xtrm = []
@@ -411,7 +431,7 @@ if train_for_prec:
         
             # Saving the model
             print('Saving weights')
-            m.model.save.weights(f'tmp/keras/{model}.h5')
+            m.model.save.weights(f'tmp/keras/{PRECIP_DATA}_{model}.h5')
         
         
 if train_for_xtrm:
@@ -461,6 +481,6 @@ if train_for_xtrm:
             
            
             # Saving the model
-            m.model.save.weights(f'tmp/keras/{model}_xtrm.h5')
+            m.model.save.weights(f'tmp/keras/{PRECIP_DATA}_{model}_xtrm.h5')
         
        

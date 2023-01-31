@@ -94,7 +94,9 @@ def eval_rf_mse(rfs, X, y):
         rmse = sqrt(mse)
         return rmse
     except:
-        return None
+        # it should return nan, otherwise none gives error when plotting
+        return np.nan
+        #return None
     
 
     
