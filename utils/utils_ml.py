@@ -621,6 +621,23 @@ def eval_roc_auc_score_on_map_withmask(y_true, y_probs, mask = None,  manual=Fal
     return roc_auc_matrix
 
 
+def IoU(y_true, y_pred):
+    """Compute the precision and recall values for each point of the map
+      Args: y_tru
+            y_probs"""
+    
+    IoU_matrix = np.zeros(y_pred.shape[1:3])
+    for i_lat in range(y_pred.shape[1]):
+        for i_lon in range(y_pred.shape[2]):
+            tn, fp, fn, tp = confusion_matrix(y_true[:, i_lat, i_lon], y_pred[:, i_lat, i_lon]).ravel()
+            IoU = tp/(tp + fp + fn)
+            IoU_matrix[i_lat, i_lon] = IoU *100  
+    
+    return IoU_matrix
+
+def get_corrcoef(true, pred):
+    return np.corrcoef(true, pred)[0, 1]
+
 
 def get_scores(true, pred, scores):
 
@@ -754,3 +771,42 @@ def score_matrix(y_true, y_probs, name_score):
             temp = get_scores(y_true[:, i_lat, i_lon], y_probs[:, i_lat, i_lon], [name_score])
             smatrix[i_lat, i_lon] = temp[name_score]
     return smatrix
+
+
+class MeanSquaredErrorNans(tf.keras.losses.Loss):
+    def __init__(self, name="mse_nans", **kwargs):
+        super().__init__(name=name, **kwargs)
+
+    def call(self, y_true, y_pred):
+        nb_values = tf.where(tf.math.is_nan(y_true),
+                         tf.zeros_like(y_true),
+                         tf.ones_like(y_true))
+        nb_values = tf.reduce_sum(nb_values)
+        y_true = tf.where(tf.math.is_nan(y_true), y_pred, y_true)
+        loss = tf.square(tf.subtract(y_pred, y_true))
+        loss_sum = tf.reduce_sum(loss)
+        return loss_sum / nb_values
+    
+    
+    
+def initiate_optimizer(lr_method, lr=.0004, init_lr=0.01, max_lr=0.01):
+    if lr_method == 'Cyclical':
+        # Cyclical learning rate
+        steps_per_epoch = dg_train.n_samples // BATCH_SIZE
+        clr = tfa.optimizers.CyclicalLearningRate(
+            initial_learning_rate=init_lr,
+            maximal_learning_rate=max_lr,
+            scale_fn=lambda x: 1/(2.**(x-1)),
+            step_size=2 * steps_per_epoch)
+        optimizer = tf.keras.optimizers.Adam(clr)
+    elif lr_method == 'CosineDecay':
+        decay_steps = EPOCHS * (dg_train.n_samples / BATCH_SIZE)
+        lr_decayed_fn = tf.keras.optimizers.schedules.CosineDecay(
+            init_lr, decay_steps)
+        optimizer = tf.keras.optimizers.Adam(lr_decayed_fn)
+    elif lr_method == 'Constant':
+        optimizer = tf.keras.optimizers.Adam(learning_rate = lr)
+    else:
+        raise ValueError('learning rate schedule not well defined.')
+        
+    return optimizer

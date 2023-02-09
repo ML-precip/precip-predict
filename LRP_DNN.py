@@ -98,8 +98,8 @@ lats_y = np.load('tmp/data/lats_y.npy')
 times = np.arange(np.datetime64('2016-01-01'), np.datetime64('2022-01-01')) #until validation period
 times = pd.to_datetime(times)
 dg_test_X = np.array(xr.open_dataarray('tmp/data/dg_test_X.nc'))
-#dg_test_Y = np.array(xr.open_dataarray('tmp/data/dg_test_Y.nc'))
-#dg_test_Y_xtrm = np.array(xr.open_dataarray('tmp/data/dg_test_Y_xtrm.nc'))
+
+dg_test_X_05 = np.ones_like(dg_test_X, dtype=float)*0.5
 
 # Define hyperparameters
 EPOCHS = 100
@@ -116,49 +116,56 @@ opt_optimizer = {'lr_method': 'Constant',
 
 models = {
           'UNET1': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 1, 'unet_use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 1, 'use_upsample': True},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET2': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 2, 'unet_use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 2, 'use_upsample': True},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET3': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 3, 'unet_use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 3, 'use_upsample': True},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET4': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 4, 'unet_use_upsample': True},
-                   'opt_optimizer': {'lr_method': 'Constant'}},
-          'UNET-att': {'model': 'Unet-attention', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop},
-                   'opt_optimizer': {'lr_method': 'Constant'}},
-          'UNET1-att': {'model': 'Unet-attention', 'run': True,
-                       'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 1, 'unet_use_upsample': True},
-                       'opt_optimizer': {'lr_method': 'Constant'}}
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 4, 'use_upsample': True},
+                   'opt_optimizer': {'lr_method': 'Constant'}}
             }
 
-##############LRP ###########
-# Select one model to evaluate the LRP
-m_id = 'UNET4'
-model = models[m_id]['model']
-opt_model_i = models[m_id]['opt_model']
-opt_optimizer_i = models[m_id]['opt_optimizer']
 
-opt_model_new = opt_model.copy()
-opt_model_new.update(opt_model_i)
-opt_optimizer_new = opt_optimizer.copy()
-opt_optimizer_new.update(opt_optimizer_i)
+# load weights and calculate LRP for the testing period
+for m_id in models:
+    
+    if not models[m_id]['run']:
+        continue
+    print(m_id)
+    # Extract model name and options
+    model = models[m_id]['model']
+    opt_model_i = models[m_id]['opt_model']
+    opt_optimizer_i = models[m_id]['opt_optimizer']
+    opt_model_new = opt_model.copy()
+    opt_model_new.update(opt_model_i)
+    opt_optimizer_new = opt_optimizer.copy()
+    opt_optimizer_new.update(opt_optimizer_i)
 
+    m = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=False, for_lrp = True, **opt_model_new)
+    m.model.load_weights(f'{DIR_WEIGHTS}ERA5-low_0.95_{m_id}.h5')
+    
+    print('loads weigths')
+     
+    models_prec.append(m)
+    
+    print('calculating LRP-comp for', m_id)
+    
+    print('analysing LRPcomp')
+    # Use the innevestigate tool
+    lrpcomp_test = calLRP(dg_test_X, m.model, 'comp', only_positive=False )
+    print('saving LRP composite')
+    np.save(f'tmp/LRP/lrpcomp_test_DNN_{m_id}.npy',lrpcomp_test)
 
-m = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=True,**opt_model_new)
+    # Save baselines
+    baseline_lrpcomp_test = calLRP(dg_test_X_05, m.model, 'comp', only_positive=False )
+    print('saving LRP composite for baseline')
+    np.save(f'tmp/LRP/baseline_lrpcomp_test_DNN_{m_id}.npy',baseline_lrpcomp_test)
+    
 
-# compile 
-m.model.compile(loss=keras.losses.categorical_crossentropy, ## instead of CategoricalCrossentropy
-                  optimizer='adam', ## lr instead of learning_rate
-                  metrics=['categorical_accuracy'])
-
-print('loads weigths')
-#m.model.summary()
-# load weights
-m.model.load_weights('tmp/tmp_weights_DNN/UNET40.95th_trained_weights.h5')
 
 ####### Analyse different methods###########
 #print('analysing LRPz')
@@ -184,54 +191,11 @@ m.model.load_weights('tmp/tmp_weights_DNN/UNET40.95th_trained_weights.h5')
 #np.save('tmp/LRP/gradient_test_DNN_UNET4.npy',gradient_LRP_test)
 #save relevances
 #save_rel(aEp_test, times, lats_y, lons_x, PATH_OUT, 'Epsilon')
-print('analysing LRP alphabeta')
+#print('analysing LRP alphabeta')
 #a1b0_train= calLRP(dg_train_X,m.model, 'a1b0' )
-a1b0_test= calLRP(dg_test_X,m.model, 'a1b0' )
-np.save('tmp/LRP/a1b0_test_DNN_UNET4.npy',a1b0_test)
+#a1b0_test= calLRP(dg_test_X,m.model, 'a1b0' )
+#np.save('tmp/LRP/a1b0_test_DNN_UNET4.npy',a1b0_test)
 #print('saving LRP alphabeta')
 #save_rel(a1b0_test, times, lats_y, lons_x, PATH_OUT, 'alphabeta')
 
 
-# Baseline
-
-m0 = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=True,**opt_model_new)
-
-# compile 
-m0.model.compile(loss=keras.losses.categorical_crossentropy, ## instead of CategoricalCrossentropy
-                  optimizer='adam', ## lr instead of learning_rate
-                  metrics=['categorical_accuracy'])
-
-print('loads weigths of NULL model')
-#m.model.summary()
-# load weights
-m0.model.load_weights('tmp/tmp_weights_DNN/UNET4_NULL_pr_trained_weights.h5')
-
-print('analysing Baselines')
-# Use the innevestigate tool
-BS_lrpab0_test = calLRP(dg_test_X,m0.model, 'a1b0', only_positive=False)
-print('saving ab0')
-np.save('tmp/LRP/BS_lrpab0_test_DNN_UNET4.npy',BS_lrpab0_test)
-
-BS_lrpagradient_test = calLRP(dg_test_X,m0.model, 'gradient', only_positive=False)
-print('saving gradient')
-np.save('tmp/LRP/BS_lrpgradient_test_DNN_UNET4.npy',BS_lrpab0_test)
-
-
-
-#print('analysing Baselines')
-# Use the innevestigate tool
-#BS_lrpz_test = calLRP(dg_test_X,m0.model, 'lrpz', only_positive=False)
-#print('saving LRPz')
-#np.save('tmp/LRP/BS_lrpz_test_DNN_UNET4.npy',BS_lrpz_test)
-
-#print('analysing LRPcomp')
-# Use the innevestigate tool
-#BS_lrpcomp_test = calLRP(dg_test_X,m0.model, 'comp', only_positive=False )
-#print('saving LRP composite')
-#np.save('tmp/LRP/BS_lrpcomp_test_DNN_UNET4.npy',BS_lrpcomp_test)
-
-#print('analysing LRPcompflat')
-# Use the innevestigate tool
-#BS_lrpcompflat_test = calLRP(dg_test_X,m0.model, 'compflat', only_positive=False)
-#print('saving LRPcompflat')
-#np.save('tmp/LRP/BS_lrpcompflat_test_DNN_UNET4.npy',BS_lrpcompflat_test)

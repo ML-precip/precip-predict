@@ -69,6 +69,8 @@ PRECIP_XTRM = 0.95 # Percentile (threshold) for the extremes
 USE_3D_ONLY = False
 CREATE_MASK_EOBS = False
 
+
+
 # Load precipitation
 if PRECIP_DATA == 'ERA5-hi':
     pr = get_nc_data(PATH_ERA5 + '/precipitation/orig_grid/daily/*nc', DATE_START, DATE_END, LONS_PREC, LATS_PREC)
@@ -234,27 +236,6 @@ output_scaling = int(dlons_x / dlons_y)
 output_crop = None
 
 
-def initiate_optimizer(lr_method, lr=.0004, init_lr=0.01, max_lr=0.01):
-    if lr_method == 'Cyclical':
-        # Cyclical learning rate
-        steps_per_epoch = dg_train.n_samples // BATCH_SIZE
-        clr = tfa.optimizers.CyclicalLearningRate(
-            initial_learning_rate=init_lr,
-            maximal_learning_rate=max_lr,
-            scale_fn=lambda x: 1/(2.**(x-1)),
-            step_size=2 * steps_per_epoch)
-        optimizer = tf.keras.optimizers.Adam(clr)
-    elif lr_method == 'CosineDecay':
-        decay_steps = EPOCHS * (dg_train.n_samples / BATCH_SIZE)
-        lr_decayed_fn = tf.keras.optimizers.schedules.CosineDecay(
-            init_lr, decay_steps)
-        optimizer = tf.keras.optimizers.Adam(lr_decayed_fn)
-    elif lr_method == 'Constant':
-        optimizer = tf.keras.optimizers.Adam(learning_rate = lr)
-    else:
-        raise ValueError('learning rate schedule not well defined.')
-        
-    return optimizer
 
 
 # Compute weights for the weighted binary crossentropy
@@ -273,24 +254,9 @@ xtrm_loss = weighted_binary_cross_entropy(
 
 
 
-class MeanSquaredErrorNans(tf.keras.losses.Loss):
-    def __init__(self, name="mse_nans", **kwargs):
-        super().__init__(name=name, **kwargs)
-
-    def call(self, y_true, y_pred):
-        nb_values = tf.where(tf.math.is_nan(y_true),
-                         tf.zeros_like(y_true),
-                         tf.ones_like(y_true))
-        nb_values = tf.reduce_sum(nb_values)
-        y_true = tf.where(tf.math.is_nan(y_true), y_pred, y_true)
-        loss = tf.square(tf.subtract(y_pred, y_true))
-        loss_sum = tf.reduce_sum(loss)
-        return loss_sum / nb_values
-
-
 
 # Define hyperparameters
-EPOCHS = 200
+EPOCHS = 100
 LR_METHOD = 'Constant'  # Cyclical, CosineDecay, Constant
     
 # Early stopping
@@ -354,14 +320,6 @@ models_ranet = {
 
 
 
-model_unet_simple = {
-          'UNET2': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 2, 'use_upsample': False},
-                   'opt_optimizer': {'lr_method': 'Constant'}},
-         }
-
-
-
 models = models_unets
 
 train_for_prec = True
@@ -403,35 +361,29 @@ if train_for_prec:
         
         optimizer = initiate_optimizer(**opt_optimizer_new)
 
-        # Load if previously saved
-        tag = pickle.dumps(opt_model_new) + pickle.dumps(opt_optimizer_new) + pickle.dumps(i_shape + o_shape) + pickle.dumps(PRECIP_XTRM)
-        hashed_name = f'prec_{m_id}_{hashlib.md5(tag).hexdigest()}'
-        tmp_file = pathlib.Path(f'tmp/{hashed_name}')
+
+        # Create the model and compile
+        # Update: to apply lrp the last activation function is recommended to be linear (see innvestigate)
+        m = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=False, for_lrp = True, **opt_model_new)
+        # Warning: When using regularizers, the loss function is the entire loss, ie (loss metrics) + (regularization term)!
+        # But the loss displayed as part of the metrics, is only the loss metric. The regularization term is not added there. -> can be different!!
+        loss_fct = 'mse'
+        if loss_regression == 'mse_nans':
+            loss_fct = MeanSquaredErrorNans()
         
-        if tmp_file.exists():
-            m = keras.models.load_model(tmp_file, custom_objects = {"MeanSquaredErrorNans": MeanSquaredErrorNans})
-            
-        else:
-            # Create the model and compile
-            m = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=False, **opt_model_new)
-            # Warning: When using regularizers, the loss function is the entire loss, ie (loss metrics) + (regularization term)!
-            # But the loss displayed as part of the metrics, is only the loss metric. The regularization term is not added there. -> can be different!!
-            loss_fct = 'mse'
-            if loss_regression == 'mse_nans':
-                loss_fct = MeanSquaredErrorNans()
-            m.model.compile(
+        m.model.compile(
                 loss=loss_fct, 
                 metrics=[loss_fct], 
                 optimizer=optimizer
             )
-            print(f'Number of parameters: {m.model.count_params()}')
+        print(f'Number of parameters: {m.model.count_params()}')
 
-            # Train
-            hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
+        # Train
+        hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
         
-            # Saving the model
-            print('Saving weights')
-            m.model.save.weights(f'tmp/keras/{PRECIP_DATA}_{model}.h5')
+        # Saving the model
+        print('Saving weights')
+        m.model.save_weights(f'tmp/keras/{PRECIP_DATA}_{PRECIP_XTRM}_{m_id}.h5')
         
         
 if train_for_xtrm:
@@ -457,30 +409,20 @@ if train_for_xtrm:
         
         optimizer = initiate_optimizer(**opt_optimizer_new)
         
-        # Load if previously saved
-        tag = pickle.dumps(opt_model_new) + pickle.dumps(opt_optimizer_new) +             pickle.dumps(i_shape + o_shape) + pickle.dumps(PRECIP_XTRM)
-        hashed_name = f'xtrm_{m_id}_{hashlib.md5(tag).hexdigest()}'
-        tmp_file = pathlib.Path(f'tmp/{hashed_name}')
-        
-        if tmp_file.exists():
-            custom_objects = {"weighted_cross_entropy_fn": weighted_binary_cross_entropy}
-            with keras.utils.custom_object_scope(custom_objects):
-                m = keras.models.load_model(tmp_file)
-            
-        else:
-            # Create the model and compile
-            m = DeepFactory(model, i_shape, o_shape, for_extremes=True, **opt_model_new)
-            m.model.compile(
+     
+        # Create the model and compile
+        m = DeepFactory_Keras(model, i_shape, o_shape, for_extremes=True, **opt_model_new)
+        m.model.compile(
                 loss=xtrm_loss,
                 optimizer=optimizer
-            )
-            print(f'Number of parameters: {m.model.count_params()}')
+        )
+        print(f'Number of parameters: {m.model.count_params()}')
 
-            # Train
-            hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
+        # Train
+        hist = m.model.fit(dg_train, validation_data=dg_valid, verbose=history_log_level, **opt_training)
             
            
-            # Saving the model
-            m.model.save.weights(f'tmp/keras/{PRECIP_DATA}_{model}_xtrm.h5')
+        # Saving the model
+        m.model.save_weights(f'tmp/keras/{PRECIP_DATA}_{PRECIP_XTRM}_{m_id}_xtrm.h5')
         
        

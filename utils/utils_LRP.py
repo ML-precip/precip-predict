@@ -46,7 +46,9 @@ def calLRP(X, model, lrpRule, only_positive=True):
     for i in np.arange(0,np.shape(X)[0]):
             sample = X[i]
             analyzer_output = analyzer.analyze(sample[np.newaxis,...])
-            deepMaps[i] = analyzer_output/np.sum(analyzer_output.flatten())
+            # no need to normalise
+            deepMaps[i] = analyzer_output
+            #deepMaps[i] = analyzer_output/np.sum(analyzer_output.flatten())
 
     ### Save only the positive contributions
             if only_positive:
@@ -74,3 +76,28 @@ def getmap_rel(a, i_shape, y_bool, allmap =True):
             m[ilat, ilon,:] = tmp.mean(axis=0)
             
     return(m)
+
+
+
+    
+def initiate_optimizer(lr_method, lr=.0004, init_lr=0.01, max_lr=0.01):
+    if lr_method == 'Cyclical':
+        # Cyclical learning rate
+        steps_per_epoch = dg_train.n_samples // BATCH_SIZE
+        clr = tfa.optimizers.CyclicalLearningRate(
+            initial_learning_rate=init_lr,
+            maximal_learning_rate=max_lr,
+            scale_fn=lambda x: 1/(2.**(x-1)),
+            step_size=2 * steps_per_epoch)
+        optimizer = tf.keras.optimizers.Adam(clr)
+    elif lr_method == 'CosineDecay':
+        decay_steps = EPOCHS * (dg_train.n_samples / BATCH_SIZE)
+        lr_decayed_fn = tf.keras.optimizers.schedules.CosineDecay(
+            init_lr, decay_steps)
+        optimizer = tf.keras.optimizers.Adam(lr_decayed_fn)
+    elif lr_method == 'Constant':
+        optimizer = tf.keras.optimizers.Adam(learning_rate = lr)
+    else:
+        raise ValueError('learning rate schedule not well defined.')
+        
+    return optimizer

@@ -19,7 +19,7 @@ class DeepFactory_Keras():
 
     def __init__(self, arch, input_size, output_size, for_extremes=False, latent_dim=128, 
                  dropout_rate=0.2, use_batch_norm=True, inner_activation='relu', unet_filters_nb=64, 
-                 unet_depth=4, use_upsample=True, output_scaling=1, output_crop=None):
+                 unet_depth=4, use_upsample=True, output_scaling=1, output_crop=None, for_lrp = False):
         super(DeepFactory_Keras, self).__init__()
         self.arch = arch
         self.input_size = list(input_size)
@@ -34,10 +34,13 @@ class DeepFactory_Keras():
         self.unet_filters_nb = unet_filters_nb
         self.output_scaling = output_scaling
         self.output_crop = output_crop
+        self.for_lrp = for_lrp
         
         self.last_activation = 'relu'
         if for_extremes:
             self.last_activation = 'sigmoid'
+        if self.for_lrp:
+            self.last_activation = 'linear'
 
         if arch == 'Davenport-2021':
             self.build_Davenport_2021()

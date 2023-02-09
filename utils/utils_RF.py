@@ -31,7 +31,7 @@ def apply_rf_classifier_model(clf, X):
        # return clf.predict_proba(X) #[:,0] #if we want the probabilities of beloging to class 0 or 1
     except:
         return None
-    
+
 def apply_rf_classifier_model_proba(clf, X):
     try:
         return clf.predict_proba(X)[:,1] #if we want the probabilities of beloging to class 0 or 1

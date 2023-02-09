@@ -110,7 +110,7 @@ def plot_relevances(rel):
 
 
     
-def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, cmap='Reds', plot=True):
+def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, cmap='Reds', vmin=None, vmax=None, plot=True):
     
     
     mx= xr.DataArray(rel, dims=["lat", "lon", "variable"],
@@ -118,7 +118,7 @@ def plot_xr_rel(rel, lats_y,lons_x, vnames, fname, cmap='Reds', plot=True):
             lon = lons_x, variable= vnames ))
     
     g = mx.plot.pcolormesh("lon", "lat", col="variable", col_wrap=4, robust=True, cmap=cmap,
-    yincrease = False, extend='max',
+    yincrease = False, extend='both',vmin=vmin, vmax=vmax,
     figsize=(14, 14),  cbar_kwargs={"orientation": "vertical", "shrink": 0.9, "aspect": 50})
     #figsize=(14, 12)
     for ax, title in zip(g.axes.flat, vnames):

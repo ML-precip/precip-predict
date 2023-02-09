@@ -139,3 +139,12 @@ def load_data(i_vars, i_paths, G, PATH_ERA5, DATE_START, DATE_END, LONS, LATS, L
     
     
     return l_vars
+
+
+def convert_to_xarray(a, lat, lon, time):
+    """Convert a numpy array into a Dataarray
+       Args: a array
+             lat, lon, time coordinales"""
+    mx= xr.DataArray(a, dims=["time","lat", "lon"],
+                      coords=dict(time = time, lat = lat,lon = lon))
+    return mx
