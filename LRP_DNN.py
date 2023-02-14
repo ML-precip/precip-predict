@@ -64,10 +64,34 @@ conf = yaml.safe_load(open("config.yaml"))
 
 #save the test data
 PATH_OUT = 'tmp/LRP/'
+DIR_WEIGHTS = '/storage/homefs/no21h426/precip-predict/tmp/keras/'
+
 
 
 #load the model configuration
 # Define args for the U-net model
+
+
+
+# load coordinates
+lons_x = np.load('tmp/data/lons_y.npy')
+lats_y = np.load('tmp/data/lats_y.npy')
+# create a time array
+times = np.arange(np.datetime64('1979-01-01'), np.datetime64('2006-01-01')) #until validation period
+times = pd.to_datetime(times)
+# load the training and testing data
+dg_train_X = np.array(xr.open_dataarray('tmp/data/dg_train_X.nc'))
+dg_train_Y = np.array(xr.open_dataarray('tmp/data/dg_train_Y.nc'))
+#dg_train_Y_xtrm = np.array(xr.open_dataarray('tmp/data/dg_train_Y_xtrm.nc'))
+
+#times = np.arange(np.datetime64('2016-01-01'), np.datetime64('2022-01-01')) #until validation period
+#times = pd.to_datetime(times)
+#dg_test_X = np.array(xr.open_dataarray('tmp/data/dg_test_X.nc'))
+
+#dg_test_X_05 = np.ones_like(dg_test_X, dtype=float)*0.5
+dg_train_X_05 = np.ones_like(dg_train_X, dtype=float)*0.5
+
+
 i_shape = conf['i_shape']
 o_shape = conf['o_shape']
 
@@ -84,25 +108,8 @@ output_scaling = 1
 output_crop = None
 
 
-# load coordinates
-lons_x = np.load('tmp/data/lons_y.npy')
-lats_y = np.load('tmp/data/lats_y.npy')
-# create a time array
-#times = np.arange(np.datetime64('1979-01-01'), np.datetime64('2006-01-01')) #until validation period
-#times = pd.to_datetime(times)
-# load the training and testing data
-#dg_train_X = np.array(xr.open_dataarray('tmp/data/dg_train_X.nc'))
-#dg_train_Y = np.array(xr.open_dataarray('tmp/data/dg_train_Y.nc'))
-#dg_train_Y_xtrm = np.array(xr.open_dataarray('tmp/data/dg_train_Y_xtrm.nc'))
-
-times = np.arange(np.datetime64('2016-01-01'), np.datetime64('2022-01-01')) #until validation period
-times = pd.to_datetime(times)
-dg_test_X = np.array(xr.open_dataarray('tmp/data/dg_test_X.nc'))
-
-dg_test_X_05 = np.ones_like(dg_test_X, dtype=float)*0.5
-
 # Define hyperparameters
-EPOCHS = 100
+EPOCHS = 10
 LR_METHOD = 'Constant'  # Cyclical, CosineDecay, Constant
                                             
 # Default model options
@@ -116,20 +123,22 @@ opt_optimizer = {'lr_method': 'Constant',
 
 models = {
           'UNET1': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 1, 'use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 1, 'use_upsample': False},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET2': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 2, 'use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 2, 'use_upsample': False},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET3': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 3, 'use_upsample': True},
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 3, 'use_upsample': False},
                    'opt_optimizer': {'lr_method': 'Constant'}},
           'UNET4': {'model': 'Unet', 'run': True,
-                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 4, 'use_upsample': True},
-                   'opt_optimizer': {'lr_method': 'Constant'}}
-            }
+                   'opt_model': {'output_scaling': output_scaling, 'output_crop': output_crop, 'unet_depth': 4, 'use_upsample': False},
+                   'opt_optimizer': {'lr_method': 'Constant'}},
+         }
 
 
+models_prec =[]
+models_xtrm = []
 # load weights and calculate LRP for the testing period
 for m_id in models:
     
@@ -156,14 +165,14 @@ for m_id in models:
     
     print('analysing LRPcomp')
     # Use the innevestigate tool
-    lrpcomp_test = calLRP(dg_test_X, m.model, 'comp', only_positive=False )
+    lrpcomp_test = calLRP(dg_train_X, m.model, 'comp', only_positive=False )
     print('saving LRP composite')
-    np.save(f'tmp/LRP/lrpcomp_test_DNN_{m_id}.npy',lrpcomp_test)
+    np.save(f'tmp/LRP/lrpcomp_train_DNN_{m_id}.npy',lrpcomp_test)
 
     # Save baselines
-    baseline_lrpcomp_test = calLRP(dg_test_X_05, m.model, 'comp', only_positive=False )
+    baseline_lrpcomp_test = calLRP(dg_train_X_05, m.model, 'comp', only_positive=False )
     print('saving LRP composite for baseline')
-    np.save(f'tmp/LRP/baseline_lrpcomp_test_DNN_{m_id}.npy',baseline_lrpcomp_test)
+    np.save(f'tmp/LRP/baseline_lrpcomp_train_DNN_{m_id}.npy',baseline_lrpcomp_test)
     
 
 

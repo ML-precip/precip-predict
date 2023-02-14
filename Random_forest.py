@@ -69,7 +69,7 @@ LATS_PREC = [30, 75]
 BATCH_SIZE = 64
 PRECIP_XTRM = 0.95 # Percentile (threshold) for the extremes
 CREATE_MASK_EOBS = False # This option is only true when using E-OBS
-RF_MAX_DEPTH =[12,14,16] #[3,4,6,8,10]
+RF_MAX_DEPTH =[14,16] #[3,4,6,8,10]
 
 
 
@@ -239,7 +239,7 @@ for i in RF_MAX_DEPTH:
                 
     # Regressor part
     # models file
-    rfs_file = f'tmp/RF/trained_regressors_RF_{PRECIP_DATA}_{i}.pkl'
+    rfs_file = f'tmp/RF/trained_regressors_RF_{PRECIP_DATA}_{PRECIP_XTRM}_{i}.pkl'
     
 
     if os.path.isfile(rfs_file):

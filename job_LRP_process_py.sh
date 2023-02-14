@@ -5,7 +5,7 @@
 #SBATCH --time=12:00:00
 #SBATCH --partition=gpu
 #SBATCH --qos=job_gpu_preempt
-#SBATCH --gres=gpu:rtx2080ti:4
+#SBATCH --gres=gpu:rtx3090:4
 
 module load Workspace
 module load Anaconda3
