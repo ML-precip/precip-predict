@@ -810,3 +810,113 @@ def initiate_optimizer(lr_method, lr=.0004, init_lr=0.01, max_lr=0.01):
         raise ValueError('learning rate schedule not well defined.')
         
     return optimizer
+
+
+
+
+
+def analyze_predictions(y_pred, dg, qq, mask=None, pred_xtrm=False, show_plots=True, plot_most_extreme=True, plot_worst_best=False, plot_scores=True, plot_confusion_components=True):
+    """Function to analyse the predictions, calculate and plot the scores
+       Args: y_pred: predictions
+             dg: true data
+             qq: extremes
+             maks: if there is mask to calculate scores (e.g., for E-OBS)
+             pred_xtrm: boolean for extreme cases
+             show_plots: boolean to visualize the outcomes
+             plot_most_extreme: boolean for plot the most extreme day
+             plot_worst_best: boolean for plot the worst prediction
+             plot_confusion_components: boolean to plot scores
+             """
+    if pred_xtrm:
+        y_pred_bool = y_pred >= 0.5
+    else:
+        y_pred_bool = y_pred > qq.to_numpy().squeeze()
+        
+    # Multiply to transorm to numeric values
+    y_pred_bool = y_pred_bool * 1
+    
+    # Extract true values
+    y_xtrm = dg.y_xtrm.to_numpy().squeeze()
+    y_prec = dg.y.to_numpy().squeeze()
+    
+    # Get the index of the max # of extremes
+    i_max_obs = np.argmax(np.sum(y_xtrm, axis=(1,2)))
+    
+    if show_plots and plot_most_extreme:
+        if pred_xtrm:
+            fig, axes = plt.subplots(figsize=(12, 3.5), ncols=2, nrows=1)
+            plot_map(axes[0], lons_y, lats_y, y_xtrm[i_max_obs], title="Day with max # extremes - truth (xtrm)", vmin=0, vmax=1)
+            plot_map(axes[1], lons_y, lats_y, y_pred[i_max_obs], title="Day with max # extremes - prediction (prob xtrm)", vmin=0, vmax=1)
+        else:
+            fig, axes = plt.subplots(figsize=(24, 3.5), ncols=4, nrows=1)
+            vmax = max(np.max(y_prec[i_max_obs]), np.max(y_pred[i_max_obs]))
+            plot_map(axes[0], lons_y, lats_y, y_prec[i_max_obs], title="Day with max # extremes - truth (val)", vmin=0, vmax=vmax)
+            plot_map(axes[1], lons_y, lats_y, y_pred[i_max_obs], title="Day with max # extremes - prediction (val)", vmin=0, vmax=vmax)
+            plot_map(axes[2], lons_y, lats_y, y_xtrm[i_max_obs], title="Day with max # extremes - truth (xtrm)", vmin=0, vmax=1)
+            plot_map(axes[3], lons_y, lats_y, y_pred_bool[i_max_obs], title="Day with max # extremes - prediction (xtrm)", vmin=0, vmax=1)
+        
+    # Get the index of the max/min difference between prediction and obs
+    y_diffs_series = np.sum(np.absolute(y_xtrm - y_pred_bool), axis=(1,2))
+    i_worst_pred = np.argmax(y_diffs_series)
+    i_best_pred = np.argmin(y_diffs_series)
+    
+    if show_plots and plot_worst_best:
+        if pred_xtrm:
+            fig, axes = plt.subplots(figsize=(24, 3.5), ncols=4, nrows=1)
+            plot_map(axes[0], lons_y, lats_y, y_xtrm[i_worst_pred], title="Worst prediction - truth", vmin=0, vmax=1)
+            plot_map(axes[1], lons_y, lats_y, y_pred[i_worst_pred], title="Worst prediction - prediction", vmin=0, vmax=1)
+            plot_map(axes[2], lons_y, lats_y, y_xtrm[i_best_pred], title="Best prediction - truth", vmin=0, vmax=1)
+            plot_map(axes[3], lons_y, lats_y, y_pred[i_best_pred], title="Best prediction - prediction", vmin=0, vmax=1)
+        else:
+            fig, axes = plt.subplots(figsize=(24, 3.5), ncols=4, nrows=1)
+            plot_map(axes[0], lons_y, lats_y, y_xtrm[i_worst_pred], title="Worst prediction - truth", vmin=0, vmax=1)
+            plot_map(axes[1], lons_y, lats_y, y_pred_bool[i_worst_pred], title="Worst prediction - prediction", vmin=0, vmax=1)
+            plot_map(axes[2], lons_y, lats_y, y_xtrm[i_best_pred], title="Best prediction - truth", vmin=0, vmax=1)
+            plot_map(axes[3], lons_y, lats_y, y_pred_bool[i_best_pred], title="Best prediction - prediction", vmin=0, vmax=1)
+    
+    # Compute scores
+    if mask is None:
+        precision, recall = eval_confusion_matrix_scores_on_map(y_xtrm, y_pred_bool)
+    else:
+        print('A mask is needed to calculate the scores')
+        precision, recall = eval_confusion_matrix_scores_on_map_withmask(y_xtrm, y_pred_bool, mask)
+
+    if pred_xtrm:
+        if mask is None:
+            roc_auc = eval_roc_auc_score_on_map(y_xtrm, y_pred)
+        else:
+            print('A mask is needed to calculate the score for extremes')
+            roc_auc = eval_roc_auc_score_on_map_withmask(y_xtrm, y_pred, mask)
+            
+        
+    if show_plots and plot_scores:
+        if pred_xtrm:
+            fig, axes = plt.subplots(figsize=(18, 4), ncols=3, nrows=1)
+        else:
+            fig, axes = plt.subplots(figsize=(12, 4), ncols=2, nrows=1)
+
+        plot_map(axes[0], lons_y, lats_y, precision, title="Precision", vmin=0, vmax=1)
+        plot_map(axes[1], lons_y, lats_y, recall, title="Recall", vmin=0, vmax=1)
+        
+        if pred_xtrm:
+            plot_map(axes[2], lons_y, lats_y, roc_auc, title="ROC AUC", vmin=0.5, vmax=1)
+
+    if show_plots and plot_confusion_components:
+        if mask is None:
+            tn, fp, fn, tp = eval_confusion_matrix_on_map(y_xtrm, y_pred_bool)
+        else:
+            print('Using mask')
+            tn, fp, fn, tp = eval_confusion_matrix_on_map(y_xtrm, y_pred_bool, mask)
+            
+        fig, axes = plt.subplots(figsize=(24, 4), ncols=4, nrows=1)
+        plot_map(axes[0], lons_y, lats_y, tn, title="True negative")
+        plot_map(axes[1], lons_y, lats_y, fp, title="False positive")
+        plot_map(axes[2], lons_y, lats_y, fn, title="False negative")
+        plot_map(axes[3], lons_y, lats_y, tp, title="True positive")
+    
+    plt.show()
+    
+    if pred_xtrm:
+        return np.nanmean(precision), np.nanmean(recall), np.nanmean(roc_auc)
+    
+    return np.nanmean(precision), np.nanmean(recall)

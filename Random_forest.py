@@ -69,7 +69,7 @@ LATS_PREC = [30, 75]
 BATCH_SIZE = 64
 PRECIP_XTRM = 0.95 # Percentile (threshold) for the extremes
 CREATE_MASK_EOBS = False # This option is only true when using E-OBS
-RF_MAX_DEPTH =[14,16] #[3,4,6,8,10]
+RF_MAX_DEPTH = [12,14]#[3,4,6,8,10,12]
 
 
 
@@ -251,7 +251,7 @@ for i in RF_MAX_DEPTH:
 
         rfs = xr.apply_ufunc(
             train_rf_regress_model,
-            X_train_dask, y_train_dask, i,
+            X_train_dask, yreg_train_dask, i,
             vectorize=True,
             dask = 'parallelized',
             input_core_dims=[['time', 'level'], ['time'], []],  # reduce along these dimensions

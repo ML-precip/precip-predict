@@ -12,7 +12,7 @@ import math
 
 
 
-def getmap_rel(a, i_shape, y_bool, allmap =True):
+def getmap_rel(a, i_shape, y_bool, lons_x, lats_y, allmap =True):
     """Function to calculate the maximum relevances when extremes occur pr_xtrm==1
        Args: a: numpy array with the relevances
              i_shape: shape of the array
