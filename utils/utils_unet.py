@@ -1,6 +1,4 @@
 from keras.models import Sequential
-from keras.layers.wrappers import TimeDistributed
-from keras.models import Sequential
 from keras.layers import Dense,LSTM,Conv2D, BatchNormalization,Flatten, MaxPooling2D
 from keras.layers import Conv2DTranspose,Concatenate,UpSampling2D,Cropping2D
 from keras.layers import Input, Lambda, Reshape, Dropout, Activation, ZeroPadding2D

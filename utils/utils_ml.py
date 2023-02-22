@@ -16,6 +16,7 @@ from collections import OrderedDict
 import tensorflow.keras.backend as K
 from sklearn.utils import class_weight
 from sklearn.utils import shuffle
+from utils.utils_plot import *
 
 
 
@@ -815,7 +816,7 @@ def initiate_optimizer(lr_method, lr=.0004, init_lr=0.01, max_lr=0.01):
 
 
 
-def analyze_predictions(y_pred, dg, qq, mask=None, pred_xtrm=False, show_plots=True, plot_most_extreme=True, plot_worst_best=False, plot_scores=True, plot_confusion_components=True):
+def analyze_predictions(y_pred, dg, qq, lons_y, lats_y, mask=None, pred_xtrm=False, show_plots=True, plot_most_extreme=True, plot_worst_best=False, plot_scores=True, plot_confusion_components=True):
     """Function to analyse the predictions, calculate and plot the scores
        Args: y_pred: predictions
              dg: true data
