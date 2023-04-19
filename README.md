@@ -1,5 +1,6 @@
-# precip-predict
-Precipitation prediction with Machine Learning
+# Precipitation prediction with Machine Learning
+
+[![DOI](https://zenodo.org/badge/454773239.svg)](https://zenodo.org/badge/latestdoi/454773239)
 
 This repository contains all the code for processing the data as well as code for the DL and RF models used in the paper Otero and Horton, 2022: 
 https://eartharxiv.org/repository/view/3447/
